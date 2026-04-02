@@ -10,8 +10,8 @@ from dotenv import load_dotenv
 load_dotenv()
 
 EMBEDDING_DIMENSIONS = 512
-CHUNK_SIZE = 500
-CHUNK_OVERLAP = 50
+CHUNK_SIZE = 150
+RELEVANCE_THRESHOLD = 0.5
 TOP_K = 2
 INDEX_PATH = "week02-rag-pipeline/index.faiss"
 CHUNKS_PATH = "week02-rag-pipeline/chunks.json"
@@ -29,15 +29,33 @@ def load_document(filepath):
         return f.read()
 
 
-def chunk_text(text, chunk_size=CHUNK_SIZE, overlap=CHUNK_OVERLAP):
-    words = text.split()
+def chunk_text(text, chunk_size=CHUNK_SIZE):
+    paragraphs = [p.strip() for p in text.split("\n\n") if p.strip()]
     chunks = []
-    start = 0
-    while start < len(words):
-        end = start + chunk_size
-        chunk = " ".join(words[start:end])
-        chunks.append(chunk)
-        start += chunk_size - overlap
+    current_chunk = []
+    current_word_count = 0
+
+    for paragraph in paragraphs:
+        paragraph_word_count = len(paragraph.split())
+
+        if current_word_count + paragraph_word_count > chunk_size and current_chunk:
+            chunks.append(" ".join(current_chunk))
+            current_chunk = []
+            current_word_count = 0
+
+        if paragraph_word_count > chunk_size:
+            if current_chunk:
+                chunks.append(" ".join(current_chunk))
+                current_chunk = []
+                current_word_count = 0
+            chunks.append(paragraph)
+        else:
+            current_chunk.append(paragraph)
+            current_word_count += paragraph_word_count
+
+    if current_chunk:
+        chunks.append(" ".join(current_chunk))
+
     return chunks
 
 
@@ -84,16 +102,25 @@ def load_index():
 def search(index, chunks, query_embedding):
     query_vector = np.array([query_embedding], dtype="float32")
     scores, indices = index.search(query_vector, TOP_K)
-    return [chunks[i] for i in indices[0]]
+    results = []
+    for score, idx in zip(scores[0], indices[0]):
+        if score >= RELEVANCE_THRESHOLD:
+            results.append(chunks[idx])
+    return results
 
 
 def ask(anthropic_client, question, context_chunks, conversation_history):
-    context = "\n\n---\n\n".join(context_chunks)
-    user_message = f"""Use the following excerpts from a document to answer the question.
+    if context_chunks:
+        context = "\n\n---\n\n".join(context_chunks)
+        user_message = f"""Use the following excerpts from a document to answer the question.
 If the answer is not in the excerpts, say so.
 
 Document excerpts:
 {context}
+
+Question: {question}"""
+    else:
+        user_message = f"""Answer the following question using your general knowledge.
 
 Question: {question}"""
 
@@ -143,8 +170,11 @@ def main():
 
         query_embedding = get_embedding(bedrock_client, question)
         context_chunks = search(index, chunks, query_embedding)
-        answer = ask(anthropic_client, question, context_chunks, conversation_history)
 
+        if not context_chunks:
+            print("\nNote: nothing relevant found in the document — answering from general knowledge.\n")
+
+        answer = ask(anthropic_client, question, context_chunks, conversation_history)
         print(f"\nClaude: {answer}\n")
 
 
