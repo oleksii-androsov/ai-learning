@@ -41,8 +41,15 @@ The index is built automatically on first run and reused on subsequent runs. If 
 ### Day 7 — Smarter chunking and relevance filtering
 - Replaced word-count chunking with paragraph-aware chunking: chunks respect document structure, paragraphs are never split mid-sentence
 - Tuned `CHUNK_SIZE` to 150 words based on actual document paragraph lengths (producing 9 focused chunks vs 3 large blobs)
-- Added relevance threshold (`RELEVANCE_THRESHOLD = 0.5`): FAISS results below the threshold are discarded rather than passed to Claude
+- Added relevance threshold (`RELEVANCE_THRESHOLD = 0.4`): FAISS results below the threshold are discarded rather than passed to Claude
 - Added general knowledge fallback: if no relevant chunks are found, Claude answers from general knowledge with a clear note to the user
+
+### Day 8 — PDF support, eval loop, threshold tuning
+- Added PDF ingestion via `pypdf` — pipeline now accepts `.txt` and `.pdf` files
+- Discovered that academic papers with complex layouts (multi-column, figures) extract poorly with `pypdf`, producing low similarity scores. Simple PDFs (reports, whitepapers) work well.
+- Added keyword-based eval loop: runs predefined question/keyword pairs against the retrieval pipeline and reports PASS/FAIL. Tests retrieval quality independently of Claude — no API call needed.
+- Tuned relevance threshold to 0.15 for PDFs vs 0.4 for clean text — highlighted that a single hardcoded threshold doesn't generalize across document types
+- Scored 4/4 on eval suite against the FSI document
 
 ## Key architectural decisions
 
@@ -59,4 +66,7 @@ The index is built automatically on first run and reused on subsequent runs. If 
 - **Sentence-level chunking** — using an NLP library (spaCy, NLTK) to split on sentence boundaries rather than paragraph boundaries for even more precise retrieval.
 - **Configurable document path** — accept the document path as a command-line argument rather than hardcoding it.
 - **Persistent conversation history** — save and reload conversation history across sessions.
+- **Query expansion** — rewrite vague user questions into multiple specific questions before retrieval, to handle cases where users ask high-level questions that don't match document vocabulary well.
+- **Dynamic relevance threshold** — calibrate per document type rather than using a single hardcoded value. A relative threshold (e.g. only use results within 20% of top score) would be more robust.
+- **Better PDF parsing** — `pypdf` struggles with multi-column academic paper layouts. `pdfplumber` or `pymupdf` handle complex layouts more reliably.
 - **Week 3** — replace FAISS with Amazon OpenSearch Serverless for a production-grade vector store.
