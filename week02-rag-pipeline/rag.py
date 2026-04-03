@@ -5,17 +5,18 @@ import numpy as np
 import faiss
 import os
 import hashlib
+from pypdf import PdfReader
 from dotenv import load_dotenv
 
 load_dotenv()
 
 EMBEDDING_DIMENSIONS = 512
 CHUNK_SIZE = 150
-RELEVANCE_THRESHOLD = 0.5
+RELEVANCE_THRESHOLD = 0.15
 TOP_K = 2
 INDEX_PATH = "week02-rag-pipeline/index.faiss"
 CHUNKS_PATH = "week02-rag-pipeline/chunks.json"
-DOCUMENT_PATH = "week02-rag-pipeline/document.txt"
+DOCUMENT_PATH = "week02-rag-pipeline/document.txt"  # supports .txt and .pdf
 HASH_PATH = "week02-rag-pipeline/document.hash"
 
 
@@ -25,6 +26,9 @@ def get_document_hash(filepath):
 
 
 def load_document(filepath):
+    if filepath.endswith(".pdf"):
+        reader = PdfReader(filepath)
+        return "\n\n".join(page.extract_text() for page in reader.pages)
     with open(filepath, "r") as f:
         return f.read()
 
@@ -157,6 +161,8 @@ def main():
         chunks = chunk_text(text)
         index, chunks = build_index(chunks, bedrock_client)
 
+    run_eval(index, chunks, bedrock_client)
+
     conversation_history = []
 
     print("Ask questions about the document. Type 'quit' to exit.\n")
@@ -176,6 +182,51 @@ def main():
 
         answer = ask(anthropic_client, question, context_chunks, conversation_history)
         print(f"\nClaude: {answer}\n")
+
+
+EVAL_QUESTIONS = [
+    {
+        "question": "What was the revenue in 2024?",
+        "expected_keywords": ["16.8", "billion"]
+    },
+    {
+        "question": "What is the NPL ratio?",
+        "expected_keywords": ["1.8%", "non-performing"]
+    },
+    {
+        "question": "Which new markets did the company enter?",
+        "expected_keywords": ["Poland", "Czech Republic", "Hungary"]
+    },
+    {
+        "question": "What is the cost-to-income ratio target for 2025?",
+        "expected_keywords": ["63%"]
+    },
+]
+
+
+def run_eval(index, chunks, bedrock_client):
+    print("\n--- Running evaluation ---\n")
+    passed = 0
+
+    for item in EVAL_QUESTIONS:
+        question = item["question"]
+        keywords = item["expected_keywords"]
+
+        query_embedding = get_embedding(bedrock_client, question)
+        context_chunks = search(index, chunks, query_embedding)
+        combined = " ".join(context_chunks).lower()
+
+        found = all(kw.lower() in combined for kw in keywords)
+        status = "PASS" if found else "FAIL"
+        if found:
+            passed += 1
+
+        print(f"[{status}] {question}")
+        if not found:
+            missing = [kw for kw in keywords if kw.lower() not in combined]
+            print(f"       Missing keywords: {missing}")
+
+    print(f"\nResult: {passed}/{len(EVAL_QUESTIONS)} passed\n")
 
 
 main()
