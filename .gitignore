@@ -6,3 +6,4 @@ __pycache__/
 *.faiss
 chunks.json
 document.hash
+week03-rag-v2/document.txt
