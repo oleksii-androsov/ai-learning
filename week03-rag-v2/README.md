@@ -26,6 +26,13 @@ The Pinecone index is created automatically on first run. Document changes are d
 
 ## Day-by-day progress
 
+### Day 11 — Automatic eval generation
+- Replaced hardcoded eval questions with automatic generation via Haiku
+- `generate_eval_questions()` reads the document and produces question + expected keyword pairs as JSON
+- `run_eval()` embeds each question, retrieves chunks, checks keyword presence — no Claude call needed for scoring
+- Defensive JSON parsing strips markdown code fences that LLMs sometimes add despite formatting instructions
+- Scored 4/5 on first run against the FSI document — one failure flagged a retrieval gap in the cloud infrastructure section
+
 ### Day 10 — Query expansion with informed document summary
 - Added `expand_query()` — rewrites user question into 3 specific sub-questions before searching
 - Blind expansion produced generic queries; fixed with informed expansion — document summary passed to Haiku so sub-questions use actual document vocabulary

@@ -206,6 +206,70 @@ Question: {question}"""
     return reply
 
 
+def generate_eval_questions(anthropic_client, text, num_questions=5):
+    # Haiku generates questions + expected keywords from the document automatically.
+    # Replaces hardcoded test sets — works for any document without human involvement.
+    # JSON format enforced so we can parse the response reliably.
+    message = anthropic_client.messages.create(
+        model=HAIKU_MODEL,
+        max_tokens=1024,
+        messages=[{
+            "role": "user",
+            "content": f"""Read this document and generate {num_questions} question and answer keyword pairs to test a retrieval system.
+
+For each question, provide 2-3 keywords or short phrases that MUST appear in the retrieved text for the answer to be correct.
+
+Return a JSON array only, no explanation. Format:
+[
+  {{"question": "...", "keywords": ["...", "..."]}},
+  ...
+]
+
+Document:
+{text}"""
+        }]
+    )
+    response_text = message.content[0].text.strip()
+    # LLMs sometimes wrap JSON in markdown code fences despite instructions —
+    # this strips them defensively without breaking responses that don't have them.
+    if response_text.startswith("```"):
+        response_text = response_text.split("```")[1]
+        if response_text.startswith("json"):
+            response_text = response_text[4:]
+    return json.loads(response_text)
+
+
+def run_eval(pinecone_index, bedrock_client, anthropic_client, text):
+    print("\n--- Generating eval questions ---")
+    eval_questions = generate_eval_questions(anthropic_client, text)
+    print(f"Generated {len(eval_questions)} questions.\n")
+
+    print("--- Running evaluation ---\n")
+    passed = 0
+
+    for item in eval_questions:
+        question = item["question"]
+        keywords = item["keywords"]
+
+        query_embedding = get_embedding(bedrock_client, question)
+        context_chunks = search(pinecone_index, query_embedding)
+        combined = " ".join(context_chunks).lower()
+
+        # Keyword presence check: tests retrieval quality without a Claude call.
+        # A FAIL means the right chunk wasn't retrieved — signal to tune chunking or threshold.
+        found = all(kw.lower() in combined for kw in keywords)
+        status = "PASS" if found else "FAIL"
+        if found:
+            passed += 1
+
+        print(f"[{status}] {question}")
+        if not found:
+            missing = [kw for kw in keywords if kw.lower() not in combined]
+            print(f"       Missing keywords: {missing}")
+
+    print(f"\nResult: {passed}/{len(eval_questions)} passed\n")
+
+
 def get_or_create_index(pc):
     existing = [idx.name for idx in pc.list_indexes()]
 
@@ -262,6 +326,9 @@ def main():
     else:
         with open(SUMMARY_PATH, "r") as f:
             document_summary = f.read()
+
+    text = load_document(DOCUMENT_PATH)
+    run_eval(pinecone_index, bedrock_client, anthropic_client, text)
 
     conversation_history = []
     print("Ask questions about the document. Type 'quit' to exit.\n")
