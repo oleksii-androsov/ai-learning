@@ -26,6 +26,12 @@ The Pinecone index is created automatically on first run. Document changes are d
 
 ## Day-by-day progress
 
+### Day 12 — GitHub Actions CI pipeline
+- Added `.github/workflows/ci.yml` — runs automatically on every push to `main`
+- Workflow spins up Ubuntu VM on GitHub's servers, installs Python 3.11 and dependencies, runs `py_compile` on all scripts
+- Catches syntax errors and missing imports before they reach the repo
+- Foundation for future steps: API tests in Week 4, eval loop in the capstone
+
 ### Day 11 — Automatic eval generation
 - Replaced hardcoded eval questions with automatic generation via Haiku
 - `generate_eval_questions()` reads the document and produces question + expected keyword pairs as JSON
