@@ -1,0 +1,31 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check out code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: |
+          pip install anthropic python-dotenv boto3 pinecone pypdf numpy faiss-cpu
+
+      - name: Check syntax
+        run: |
+          python -m py_compile week01-python-basics/hello_claude.py
+          python -m py_compile week02-rag-pipeline/rag.py
+          python -m py_compile week03-rag-v2/rag.py
+          echo "All files passed syntax check."
