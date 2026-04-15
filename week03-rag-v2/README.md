@@ -26,6 +26,12 @@ The Pinecone index is created automatically on first run. Document changes are d
 
 ## Day-by-day progress
 
+### Day 13 — Architecture Decision Log + Week 3 comprehension check
+- Created `decisions.md` with 7 formal ADRs covering every major architectural decision in Week 3
+- Each ADR captures: context, decision, alternatives considered, and tradeoffs
+- Comprehension check passed: query expansion, metadata storage, model routing, MD5 cache invalidation, keyword-based eval
+- Closes out Week 3 — RAG v2 pipeline complete with persistent vector store, query expansion, automatic eval, and CI
+
 ### Day 12 — GitHub Actions CI pipeline
 - Added `.github/workflows/ci.yml` — runs automatically on every push to `main`
 - Workflow spins up Ubuntu VM on GitHub's servers, installs Python 3.11 and dependencies, runs `py_compile` on all scripts
