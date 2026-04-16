@@ -23,10 +23,9 @@ from rag import (
     expand_query,
     ask,
     get_document_hash,
-    get_embedding,
     get_or_create_index,
     load_document,
-    search,
+    retrieve_chunks,
     summarize_document,
 )
 
@@ -95,16 +94,6 @@ def health():
 @app.post("/ask", response_model=AnswerResponse)
 def ask_question(request: QuestionRequest):
     queries = expand_query(clients["anthropic"], request.question, clients["summary"])
-
-    all_chunks = []
-    seen = set()
-    for query in queries:
-        query_embedding = get_embedding(clients["bedrock"], query)
-        chunks = search(clients["index"], query_embedding)
-        for chunk in chunks:
-            if chunk not in seen:
-                seen.add(chunk)
-                all_chunks.append(chunk)
-
-    answer = ask(clients["anthropic"], request.question, all_chunks, [])
-    return AnswerResponse(answer=answer, sources_found=bool(all_chunks))
+    context_chunks = retrieve_chunks(clients["index"], clients["bedrock"], queries)
+    answer = ask(clients["anthropic"], request.question, context_chunks, [])
+    return AnswerResponse(answer=answer, sources_found=bool(context_chunks))

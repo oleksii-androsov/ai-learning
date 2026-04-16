@@ -151,6 +151,19 @@ def search(pinecone_index, query_embedding):
     ]
 
 
+def retrieve_chunks(pinecone_index, bedrock_client, queries):
+    all_chunks = []
+    seen = set()
+    for query in queries:
+        query_embedding = get_embedding(bedrock_client, query)
+        chunks = search(pinecone_index, query_embedding)
+        for chunk in chunks:
+            if chunk not in seen:
+                seen.add(chunk)
+                all_chunks.append(chunk)
+    return all_chunks
+
+
 def expand_query(anthropic_client, question, document_summary):
     # Informed query expansion: Haiku generates domain-specific sub-questions
     # using the document summary as context. Without the summary, expansion is
@@ -343,19 +356,7 @@ def main():
         queries = expand_query(anthropic_client, question, document_summary)
         print(f"\nExpanded queries: {queries}\n")
 
-        # Deduplicate chunks across all expanded queries using a set.
-        # Same chunk may match multiple sub-questions — include it only once.
-        all_chunks = []
-        seen = set()
-        for query in queries:
-            query_embedding = get_embedding(bedrock_client, query)
-            chunks = search(pinecone_index, query_embedding)
-            for chunk in chunks:
-                if chunk not in seen:
-                    seen.add(chunk)
-                    all_chunks.append(chunk)
-
-        context_chunks = all_chunks
+        context_chunks = retrieve_chunks(pinecone_index, bedrock_client, queries)
 
         if not context_chunks:
             print("\nNote: nothing relevant found in the document — answering from general knowledge.\n")
