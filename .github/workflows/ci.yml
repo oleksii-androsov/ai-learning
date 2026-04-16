@@ -23,11 +23,12 @@ jobs:
 
       - name: Install dependencies
         run: |
-          pip install anthropic python-dotenv boto3 pinecone pypdf numpy faiss-cpu
+          pip install anthropic python-dotenv boto3 pinecone pypdf numpy faiss-cpu fastapi uvicorn
 
       - name: Check syntax
         run: |
           python -m py_compile week01-python-basics/hello_claude.py
           python -m py_compile week02-rag-pipeline/rag.py
           python -m py_compile week03-rag-v2/rag.py
+          python -m py_compile week04-rag-api/api.py
           echo "All files passed syntax check."

@@ -364,4 +364,5 @@ def main():
         print(f"\nClaude: {answer}\n")
 
 
-main()
+if __name__ == "__main__":
+    main()
