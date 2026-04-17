@@ -5,7 +5,8 @@ from contextlib import asynccontextmanager
 import anthropic
 import boto3
 from dotenv import load_dotenv
-from fastapi import FastAPI
+from fastapi import Depends, FastAPI, HTTPException, Security
+from fastapi.security.api_key import APIKeyHeader
 from pinecone import Pinecone
 from pydantic import BaseModel
 
@@ -30,6 +31,15 @@ from rag import (
 )
 
 load_dotenv()
+
+API_KEY = os.environ["RAG_API_KEY"]
+api_key_header = APIKeyHeader(name="X-API-Key")
+
+
+def verify_api_key(key: str = Security(api_key_header)):
+    if key != API_KEY:
+        raise HTTPException(status_code=401, detail="Invalid API key")
+
 
 # Shared state: clients and index are created once at startup and reused for every request.
 # Creating them per-request would be slow — each client initialization involves
@@ -91,7 +101,7 @@ def health():
     return {"status": "ok"}
 
 
-@app.post("/ask", response_model=AnswerResponse)
+@app.post("/ask", response_model=AnswerResponse, dependencies=[Depends(verify_api_key)])
 def ask_question(request: QuestionRequest):
     queries = expand_query(clients["anthropic"], request.question, clients["summary"])
     context_chunks = retrieve_chunks(clients["index"], clients["bedrock"], queries)
