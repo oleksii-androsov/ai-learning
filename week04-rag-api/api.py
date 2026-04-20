@@ -1,18 +1,18 @@
+import json
+import logging
 import os
 import sys
+import time
 from contextlib import asynccontextmanager
 
 import anthropic
 import boto3
 from dotenv import load_dotenv
-from fastapi import Depends, FastAPI, HTTPException, Security
+from fastapi import Depends, FastAPI, HTTPException, Request, Security
 from fastapi.security.api_key import APIKeyHeader
 from pinecone import Pinecone
 from pydantic import BaseModel
 
-# Tell Python where to find rag.py from week03.
-# os.path.dirname(__file__) is the folder this file lives in (week04-rag-api).
-# We go one level up (..) then into week03-rag-v2 to reach rag.py.
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "week03-rag-v2"))
 
 from rag import (
@@ -32,6 +32,22 @@ from rag import (
 
 load_dotenv()
 
+
+class JsonFormatter(logging.Formatter):
+    def format(self, record):
+        return json.dumps({
+            "timestamp": self.formatTime(record),
+            "level": record.levelname,
+            "message": record.getMessage(),
+            "logger": record.name,
+        })
+
+
+handler = logging.StreamHandler()
+handler.setFormatter(JsonFormatter())
+logging.basicConfig(level=logging.INFO, handlers=[handler])
+logger = logging.getLogger("rag-api")
+
 API_KEY = os.environ["RAG_API_KEY"]
 api_key_header = APIKeyHeader(name="X-API-Key")
 
@@ -41,15 +57,12 @@ def verify_api_key(key: str = Security(api_key_header)):
         raise HTTPException(status_code=401, detail="Invalid API key")
 
 
-# Shared state: clients and index are created once at startup and reused for every request.
-# Creating them per-request would be slow — each client initialization involves
-# network connections and credential lookups.
 clients = {}
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    print("Starting up — loading clients and checking index...")
+    logger.info("Starting up — loading clients and checking index...")
 
     clients["bedrock"] = boto3.client("bedrock-runtime", region_name="eu-central-1")
     clients["anthropic"] = anthropic.Anthropic(api_key=os.environ["ANTHROPIC_API_KEY"])
@@ -65,7 +78,7 @@ async def lifespan(app: FastAPI):
                 needs_indexing = False
 
     if needs_indexing:
-        print("Document changed or not indexed — rebuilding...")
+        logger.info("Document changed or not indexed — rebuilding...")
         text = load_document(DOCUMENT_PATH)
         chunks = chunk_text(text)
         build_index(clients["index"], chunks, clients["bedrock"])
@@ -75,16 +88,29 @@ async def lifespan(app: FastAPI):
         with open(SUMMARY_PATH, "w") as f:
             f.write(clients["summary"])
     else:
-        print("Document unchanged — using existing index.")
+        logger.info("Document unchanged — using existing index.")
         with open(SUMMARY_PATH, "r") as f:
             clients["summary"] = f.read()
 
-    print("Ready.\n")
+    logger.info("Ready.")
     yield
-    # Nothing to clean up on shutdown
 
 
 app = FastAPI(lifespan=lifespan)
+
+
+@app.middleware("http")
+async def log_requests(request: Request, call_next):
+    start = time.time()
+    response = await call_next(request)
+    duration_ms = round((time.time() - start) * 1000)
+    logger.info(json.dumps({
+        "method": request.method,
+        "path": request.url.path,
+        "status_code": response.status_code,
+        "duration_ms": duration_ms,
+    }))
+    return response
 
 
 class QuestionRequest(BaseModel):
