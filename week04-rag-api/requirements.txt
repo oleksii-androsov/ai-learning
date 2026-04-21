@@ -6,3 +6,5 @@ pypdf
 numpy
 fastapi
 uvicorn
+streamlit
+requests
