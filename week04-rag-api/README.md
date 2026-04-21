@@ -33,6 +33,14 @@ Pinecone + AWS Bedrock + Claude
 
 ## Day-by-day progress
 
+### Day 17 — Streamlit frontend
+- Built a chat UI with `streamlit_app.py` — text input, message history, spinner while waiting for response
+- Deployed on the same EC2 instance as the API, accessible at port 8501
+- UI maintains conversation display via `st.session_state` — previous messages stay visible across interactions
+- Each question sent to the API independently (stateless) — conversation history in UI only, not in AI context
+- Graceful error handling for timeouts and unreachable API
+- Port 8501 opened in EC2 security group restricted to own IP
+
 ### Day 16 — Datadog observability (unplanned)
 - Installed Datadog Agent on EC2 — infrastructure metrics (CPU, memory, disk, network) flowing automatically
 - Replaced `print()` with Python `logging` module and custom `JsonFormatter` — every log line is now a JSON object
