@@ -33,6 +33,15 @@ Pinecone + AWS Bedrock + Claude
 
 ## Day-by-day progress
 
+### Day 16 — Datadog observability (unplanned)
+- Installed Datadog Agent on EC2 — infrastructure metrics (CPU, memory, disk, network) flowing automatically
+- Replaced `print()` with Python `logging` module and custom `JsonFormatter` — every log line is now a JSON object
+- Configured Agent to tail `server.log`, added Grok parser to extract `method`, `path`, `status_code`, `duration_ms`
+- Created log-based metric `rag.api.request.count` grouped by `status_code`
+- Instrumented with `ddtrace-run` — zero code changes, automatic spans for FastAPI, Anthropic, Bedrock, and Pinecone
+- Built dashboard combining infrastructure metrics, log-based metrics, and APM latency
+- Created 3 monitors: CPU threshold, p95 latency, error rate
+
 ### Day 15 — EC2 deployment + API key authentication
 - Added API key authentication to `/ask` — requests without a valid `X-API-Key` header get 401
 - Deployed to AWS EC2 (t3.micro, Ubuntu 24.04, eu-central-1) — API now accessible at a real public IP
