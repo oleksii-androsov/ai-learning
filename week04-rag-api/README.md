@@ -33,6 +33,12 @@ Pinecone + AWS Bedrock + Claude
 
 ## Day-by-day progress
 
+### Day 18 — File upload, conversation history, CI/CD
+- `/upload` endpoint: accepts PDF or TXT via multipart form, re-indexes Pinecone without restarting the server
+- Conversation history: Streamlit sends full message history with each `/ask` request; Claude sees prior turns
+- CI/CD pipeline via GitHub Actions: `validate` job runs syntax checks on push/PR; `deploy` job SSH-es into EC2, pulls latest code, restarts both uvicorn and Streamlit, and verifies with a health check — all on push to main
+- Port 22 opened to 0.0.0.0/0 in EC2 security group to allow GitHub Actions runners to connect
+
 ### Day 17 — Streamlit frontend
 - Built a chat UI with `streamlit_app.py` — text input, message history, spinner while waiting for response
 - Deployed on the same EC2 instance as the API, accessible at port 8501
