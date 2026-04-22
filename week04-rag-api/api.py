@@ -130,17 +130,20 @@ def health():
 
 @app.post("/upload", dependencies=[Depends(verify_api_key)])
 async def upload_document(file: UploadFile = File(...)):
+    ext = os.path.splitext(file.filename)[1].lower()
+    upload_path = os.path.splitext(DOCUMENT_PATH)[0] + ext
+
     contents = await file.read()
-    with open(DOCUMENT_PATH, "wb") as f:
+    with open(upload_path, "wb") as f:
         f.write(contents)
 
     logger.info(f"Document uploaded: {file.filename}")
 
-    text = load_document(DOCUMENT_PATH)
+    text = load_document(upload_path)
     chunks = chunk_text(text)
     build_index(clients["index"], chunks, clients["bedrock"])
 
-    current_hash = get_document_hash(DOCUMENT_PATH)
+    current_hash = get_document_hash(upload_path)
     with open(HASH_PATH, "w") as f:
         f.write(current_hash)
 
