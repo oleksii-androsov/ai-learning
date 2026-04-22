@@ -32,3 +32,38 @@ jobs:
           python -m py_compile week03-rag-v2/rag.py
           python -m py_compile week04-rag-api/api.py
           echo "All files passed syntax check."
+
+  deploy:
+    runs-on: ubuntu-latest
+    needs: validate
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    env:
+      FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
+    steps:
+      - name: Deploy to EC2
+        uses: appleboy/ssh-action@v1.2.2
+        with:
+          host: ${{ secrets.EC2_HOST }}
+          username: ubuntu
+          key: ${{ secrets.EC2_SSH_KEY }}
+          script: |
+            cd /home/ubuntu/ai-learning
+            git pull
+            pkill -f "uvicorn week04-rag-api" || true
+            pkill -f "streamlit" || true
+            sleep 2
+            nohup /home/ubuntu/ai-learning/.venv/bin/ddtrace-run \
+              /home/ubuntu/ai-learning/.venv/bin/uvicorn \
+              week04-rag-api.api:app --host 0.0.0.0 --port 8000 \
+              > /home/ubuntu/ai-learning/server.log 2>&1 &
+            disown
+            sleep 3
+            nohup /home/ubuntu/ai-learning/.venv/bin/streamlit run \
+              /home/ubuntu/ai-learning/week04-rag-api/streamlit_app.py \
+              --server.port 8501 --server.address 0.0.0.0 \
+              > /home/ubuntu/ai-learning/streamlit.log 2>&1 &
+            disown
+            sleep 3
+            curl -sf http://localhost:8000/health || exit 1
+            echo "Deployment successful."
