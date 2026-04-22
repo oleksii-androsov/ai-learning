@@ -50,18 +50,7 @@ jobs:
           script: |
             cd /home/ubuntu/ai-learning
             git pull
-            pkill -f "uvicorn week04-rag-api" || true
-            pkill -f "streamlit" || true
-            sleep 2
-            nohup /home/ubuntu/ai-learning/.venv/bin/ddtrace-run \
-              /home/ubuntu/ai-learning/.venv/bin/uvicorn \
-              week04-rag-api.api:app --host 0.0.0.0 --port 8000 \
-              </dev/null > /home/ubuntu/ai-learning/server.log 2>&1 &
-            sleep 3
-            nohup /home/ubuntu/ai-learning/.venv/bin/streamlit run \
-              /home/ubuntu/ai-learning/week04-rag-api/streamlit_app.py \
-              --server.port 8501 --server.address 0.0.0.0 \
-              </dev/null > /home/ubuntu/ai-learning/streamlit.log 2>&1 &
-            sleep 3
+            sudo systemctl restart rag-api rag-streamlit
+            sleep 5
             curl -sf http://localhost:8000/health || exit 1
             echo "Deployment successful."
