@@ -115,6 +115,7 @@ async def log_requests(request: Request, call_next):
 
 class QuestionRequest(BaseModel):
     question: str
+    history: list[dict] = []
 
 
 class AnswerResponse(BaseModel):
@@ -131,5 +132,5 @@ def health():
 def ask_question(request: QuestionRequest):
     queries = expand_query(clients["anthropic"], request.question, clients["summary"])
     context_chunks = retrieve_chunks(clients["index"], clients["bedrock"], queries)
-    answer = ask(clients["anthropic"], request.question, context_chunks, [])
+    answer = ask(clients["anthropic"], request.question, context_chunks, request.history)
     return AnswerResponse(answer=answer, sources_found=bool(context_chunks))

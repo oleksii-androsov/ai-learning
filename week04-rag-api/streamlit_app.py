@@ -27,9 +27,13 @@ if question := st.chat_input("Ask a question..."):
     with st.chat_message("assistant"):
         with st.spinner("Thinking..."):
             try:
+                history = [
+                    {"role": m["role"], "content": m["content"]}
+                    for m in st.session_state.messages[:-1]
+                ]
                 response = requests.post(
                     f"{API_URL}/ask",
-                    json={"question": question},
+                    json={"question": question, "history": history},
                     headers={"X-API-Key": API_KEY},
                     timeout=60,
                 )
