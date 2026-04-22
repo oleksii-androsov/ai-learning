@@ -8,7 +8,7 @@ from contextlib import asynccontextmanager
 import anthropic
 import boto3
 from dotenv import load_dotenv
-from fastapi import Depends, FastAPI, HTTPException, Request, Security
+from fastapi import Depends, FastAPI, File, HTTPException, Request, Security, UploadFile
 from fastapi.security.api_key import APIKeyHeader
 from pinecone import Pinecone
 from pydantic import BaseModel
@@ -126,6 +126,30 @@ class AnswerResponse(BaseModel):
 @app.get("/health")
 def health():
     return {"status": "ok"}
+
+
+@app.post("/upload", dependencies=[Depends(verify_api_key)])
+async def upload_document(file: UploadFile = File(...)):
+    contents = await file.read()
+    with open(DOCUMENT_PATH, "wb") as f:
+        f.write(contents)
+
+    logger.info(f"Document uploaded: {file.filename}")
+
+    text = load_document(DOCUMENT_PATH)
+    chunks = chunk_text(text)
+    build_index(clients["index"], chunks, clients["bedrock"])
+
+    current_hash = get_document_hash(DOCUMENT_PATH)
+    with open(HASH_PATH, "w") as f:
+        f.write(current_hash)
+
+    clients["summary"] = summarize_document(clients["anthropic"], text)
+    with open(SUMMARY_PATH, "w") as f:
+        f.write(clients["summary"])
+
+    logger.info("Re-indexing complete.")
+    return {"message": f"Document '{file.filename}' indexed successfully.", "chunks": len(chunks)}
 
 
 @app.post("/ask", response_model=AnswerResponse, dependencies=[Depends(verify_api_key)])

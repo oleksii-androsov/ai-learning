@@ -12,6 +12,25 @@ API_KEY = os.environ["RAG_API_KEY"]
 st.title("RAG Document Assistant")
 st.caption("Ask questions about the loaded document.")
 
+with st.sidebar:
+    st.header("Document")
+    uploaded_file = st.file_uploader("Upload a document", type=["txt", "pdf"])
+    if uploaded_file and st.button("Index document"):
+        with st.spinner("Indexing..."):
+            try:
+                response = requests.post(
+                    f"{API_URL}/upload",
+                    files={"file": (uploaded_file.name, uploaded_file.getvalue(), uploaded_file.type)},
+                    headers={"X-API-Key": API_KEY},
+                    timeout=120,
+                )
+                response.raise_for_status()
+                data = response.json()
+                st.success(data["message"])
+                st.caption(f"{data['chunks']} chunks indexed.")
+            except requests.exceptions.RequestException as e:
+                st.error(f"Upload failed: {e}")
+
 if "messages" not in st.session_state:
     st.session_state.messages = []
 
