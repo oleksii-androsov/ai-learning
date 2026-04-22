@@ -8,3 +8,10 @@ chunks.json
 document.hash
 document.summary
 week03-rag-v2/document.txt
+
+# Terraform
+terraform/.terraform/
+terraform/terraform.tfstate
+terraform/terraform.tfstate.backup
+terraform/terraform.tfvars
+terraform/.terraform.lock.hcl
