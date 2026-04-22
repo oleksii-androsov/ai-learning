@@ -33,11 +33,12 @@ Pinecone + AWS Bedrock + Claude
 
 ## Day-by-day progress
 
-### Day 18 — File upload, conversation history, CI/CD
+### Day 18 — File upload, conversation history, CI/CD, Terraform
 - `/upload` endpoint: accepts PDF or TXT via multipart form, re-indexes Pinecone without restarting the server
-- Conversation history: Streamlit sends full message history with each `/ask` request; Claude sees prior turns
-- CI/CD pipeline via GitHub Actions: `validate` job runs syntax checks on push/PR; `deploy` job SSH-es into EC2, pulls latest code, restarts both uvicorn and Streamlit, and verifies with a health check — all on push to main
-- Port 22 opened to 0.0.0.0/0 in EC2 security group to allow GitHub Actions runners to connect
+- Conversation history: Streamlit sends full message history with each `/ask` request; Claude sees prior turns in context
+- Switched from `nohup` to systemd for service management — more reliable, survives reboots, restarts on failure
+- CI/CD via GitHub Actions: `validate` job checks syntax on push/PR; `deploy` job SSH-es into EC2, pulls latest code, does `systemctl restart`, and verifies with a health check — all triggered on push to main
+- First Terraform template (`terraform/`) — defines EC2 instance, security group, and key pair as code; `user_data.sh` bootstraps a fresh instance end-to-end; `terraform destroy` tears everything down cleanly
 
 ### Day 17 — Streamlit frontend
 - Built a chat UI with `streamlit_app.py` — text input, message history, spinner while waiting for response
@@ -71,13 +72,15 @@ Pinecone + AWS Bedrock + Claude
 
 ## Key architectural decisions
 
-- **Stateless requests** — no server-side conversation history in this iteration. Each `/ask` call is independent. Three options for adding history: client-side (Streamlit sends full history with each request), server-side in-memory (dict keyed by session ID, lost on restart), or persistent store (DynamoDB/Redis). Will iterate toward Option 3.
+- **Client-side conversation history** — Streamlit sends the full message history with each `/ask` request. Claude sees prior turns without the server storing any state. Simple and stateless; the tradeoff is history is lost if the browser tab closes. Next iteration: DynamoDB for persistent sessions.
+- **Stateless requests** — each `/ask` call is self-contained. Three options for server-side history: in-memory dict keyed by session ID (lost on restart), or DynamoDB/Redis for persistence. Currently using client-side (Option 1).
 - **Clients created at startup, not per request** — Pinecone, Bedrock, and Anthropic clients involve network connections and credential resolution. Creating them once and reusing them avoids that overhead on every request.
 - **RAG logic imported from week03** — no code duplication. `sys.path` used to import across folders with hyphenated names. In a production codebase this logic would live in a shared package.
 - **API key auth via `X-API-Key` header** — static secret stored in `.env`, checked on every `/ask` request via a FastAPI dependency. Simple and effective for a private API. `/health` is intentionally left public for monitoring.
 
 ## What I'd do differently
 
-- **Add conversation history** — iterate through client-side, then server-side session, then DynamoDB persistence
+- **DynamoDB for conversation history** — client-side history works but is lost on tab close; next step is persistent sessions keyed by session ID
 - **Add a shared package** — extract RAG functions into a proper Python package rather than using `sys.path` manipulation
-- **Add request validation** — minimum question length, rate limiting, auth token
+- **Add request validation** — minimum question length, rate limiting, input sanitisation
+- **Test Terraform before documenting it** — the IaC template is written but not yet validated end-to-end; setup instructions still reflect the manual process until that's confirmed
