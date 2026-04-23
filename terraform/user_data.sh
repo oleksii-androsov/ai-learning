@@ -3,7 +3,7 @@ set -e
 exec > /var/log/user_data.log 2>&1
 
 apt-get update -y
-apt-get install -y python3.11 python3.11-venv python3-pip git
+apt-get install -y python3 python3-venv python3-pip git
 
 git clone ${repo_url} /home/ubuntu/ai-learning
 chown -R ubuntu:ubuntu /home/ubuntu/ai-learning
