@@ -16,13 +16,78 @@ Pinecone + AWS Bedrock + Claude
 {"answer": "...", "sources_found": true}
 ```
 
-## Getting started
+## Deploying with Terraform
 
-1. Clone the repo and follow the setup in the root README
-2. Add AWS and Pinecone credentials to `.env` (see `.env.example`)
+Prerequisites: AWS account, Terraform installed, AWS credentials configured.
+
+**1. Create your variables file**
+```bash
+cd terraform
+cp terraform.tfvars.example terraform.tfvars
+```
+Edit `terraform.tfvars` and paste your SSH public key:
+```bash
+ssh-keygen -y -f your-key.pem
+```
+
+**2. Provision the infrastructure**
+```bash
+terraform init
+terraform apply
+```
+Takes about 15 seconds. Note the `public_ip` output.
+
+**3. Wait for bootstrap to complete (~4 minutes)**
+
+The instance runs `user_data.sh` on first boot — installs Python, clones the repo, sets up the venv, configures systemd. Monitor progress:
+```bash
+ssh -i your-key.pem ubuntu@<public_ip>
+cat /var/log/user_data.log | tail -20
+```
+Bootstrap is done when you see the systemd symlinks created at the end of the log.
+
+**4. Copy secrets onto the instance**
+```bash
+scp -i your-key.pem .env ubuntu@<public_ip>:~/ai-learning/.env
+scp -i your-key.pem week03-rag-v2/document.txt ubuntu@<public_ip>:~/ai-learning/week03-rag-v2/document.txt
+```
+
+**5. Start the services**
+```bash
+ssh -i your-key.pem ubuntu@<public_ip>
+sudo systemctl start rag-api rag-streamlit
+```
+
+**6. Verify**
+```bash
+curl -s http://localhost:8000/health
+# → {"status":"ok"}
+```
+
+Streamlit UI is available at `http://<public_ip>:8501`
+
+**7. Update CI/CD** (if using GitHub Actions)
+
+Copy the `update_github_secret` output from `terraform apply` and run it:
+```bash
+gh secret set EC2_HOST --body <public_ip>
+```
+
+**Tear down when done:**
+```bash
+terraform destroy
+```
+
+> **Note:** Secrets are not automated. `.env` and `document.txt` must be copied manually after each fresh `terraform apply`. Production deployments would use AWS Secrets Manager for this.
+
+## Running locally
+
+1. Clone the repo
+2. Copy `.env.example` to `.env` and fill in your credentials
 3. Place your document at `week03-rag-v2/document.txt`
-4. Run: `uvicorn week04-rag-api.api:app --reload`
-5. Test: `curl -X POST http://localhost:8000/ask -H "Content-Type: application/json" -H "X-API-Key: your-key" -d '{"question": "What is this document about?"}'`
+4. `pip install -r week04-rag-api/requirements.txt`
+5. `uvicorn week04-rag-api.api:app --reload`
+6. Test: `curl -X POST http://localhost:8000/ask -H "Content-Type: application/json" -H "X-API-Key: your-key" -d '{"question": "What is this document about?"}'`
 
 ## Endpoints
 
@@ -83,4 +148,4 @@ Pinecone + AWS Bedrock + Claude
 - **DynamoDB for conversation history** — client-side history works but is lost on tab close; next step is persistent sessions keyed by session ID
 - **Add a shared package** — extract RAG functions into a proper Python package rather than using `sys.path` manipulation
 - **Add request validation** — minimum question length, rate limiting, input sanitisation
-- **Test Terraform before documenting it** — the IaC template is written but not yet validated end-to-end; setup instructions still reflect the manual process until that's confirmed
+- **AWS Secrets Manager for secrets** — `.env` and `document.txt` require manual copying after each `terraform apply`; production deployments would pull secrets from Secrets Manager in `user_data.sh`
