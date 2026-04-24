@@ -1,4 +1,5 @@
 import os
+import requests
 from dotenv import load_dotenv
 import anthropic
 from tavily import TavilyClient
@@ -6,6 +7,8 @@ from tavily import TavilyClient
 load_dotenv()
 
 tavily = TavilyClient(api_key=os.environ["TAVILY_API_KEY"])
+TMDB_API_KEY = os.environ["TMDB_API_KEY"]
+TMDB_BASE = "https://api.themoviedb.org/3"
 
 client = anthropic.Anthropic(api_key=os.environ["ANTHROPIC_API_KEY"])
 
@@ -31,8 +34,59 @@ tools = [
             },
             "required": []
         }
+    },
+    {
+        "name": "get_movie_details",
+        "description": "Look up structured details about a specific movie by title: rating, runtime, genres, director, top cast, plot summary, and TMDB score. Use this when the user mentions a specific film and you need accurate facts about it.",
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "title": {
+                    "type": "string",
+                    "description": "The movie title to look up, e.g. 'Arrival', 'Dune: Part Two'"
+                }
+            },
+            "required": ["title"]
+        }
     }
 ]
+
+
+def get_movie_details(title):
+    search = requests.get(
+        f"{TMDB_BASE}/search/movie",
+        params={"api_key": TMDB_API_KEY, "query": title}
+    ).json()
+
+    if "results" not in search:
+        return f"TMDB error: {search.get('status_message', search)}"
+
+    if not search["results"]:
+        return f"No results found for '{title}'"
+
+    movie_id = search["results"][0]["id"]
+
+    details = requests.get(
+        f"{TMDB_BASE}/movie/{movie_id}",
+        params={"api_key": TMDB_API_KEY, "append_to_response": "credits"}
+    ).json()
+
+    director = next(
+        (c["name"] for c in details["credits"]["crew"] if c["job"] == "Director"),
+        "Unknown"
+    )
+    cast = ", ".join(m["name"] for m in details["credits"]["cast"][:5])
+    genres = ", ".join(g["name"] for g in details["genres"])
+
+    return (
+        f"Title: {details['title']} ({details.get('release_date', '')[:4]})\n"
+        f"Rating: {details['vote_average']:.1f}/10 ({details['vote_count']} votes)\n"
+        f"Runtime: {details.get('runtime', 'N/A')} min\n"
+        f"Genres: {genres}\n"
+        f"Director: {director}\n"
+        f"Cast: {cast}\n"
+        f"Overview: {details['overview']}"
+    )
 
 
 def discover_movies(mood=None, genre=None, who_is_watching=None):
@@ -55,6 +109,8 @@ def discover_movies(mood=None, genre=None, who_is_watching=None):
 def run_tool(tool_name, tool_input):
     if tool_name == "discover_movies":
         return discover_movies(**tool_input)
+    if tool_name == "get_movie_details":
+        return get_movie_details(**tool_input)
     return f"Unknown tool: {tool_name}"
 
 
