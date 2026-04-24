@@ -58,6 +58,12 @@ Claude decides autonomously:
 
 ## Day-by-day progress
 
+### Day 2 — get_movie_details tool via TMDB
+- Added `get_movie_details(title)` — searches TMDB by title, fetches full details with cast in a single call using `append_to_response=credits`
+- Returns rating, runtime, genres, director, top 5 cast, and plot overview
+- TMDB requires the short API Key (not the Read Access Token) for query parameter auth
+- Agent now chains both tools naturally: discovers candidates with Tavily, then fetches structured facts from TMDB for specific titles
+
 ### Day 1 — Core agent loop + discover_movies tool
 - Built the tool use conversation loop: Claude calls tools, we execute them, feed results back, repeat until `end_turn`
 - First tool: `discover_movies(mood, genre, who_is_watching)` — Tavily web search returning current results
