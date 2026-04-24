@@ -37,7 +37,7 @@ tools = [
     },
     {
         "name": "get_movie_details",
-        "description": "Look up structured details about a specific movie by title: rating, runtime, genres, director, top cast, plot summary, and TMDB score. Use this when the user mentions a specific film and you need accurate facts about it.",
+        "description": "Look up structured details about a specific movie by title: rating, runtime, genres, director, top cast, plot summary, and TMDB score. Use this when the user mentions a specific film and you need accurate facts about it. If the title is ambiguous or part of a franchise with multiple entries (e.g. 'Avengers', 'Dune', 'Lord of the Rings'), ask the user to clarify which one they mean before calling this tool.",
         "input_schema": {
             "type": "object",
             "properties": {
@@ -118,10 +118,12 @@ def chat():
     print("Movie Buddy — your personal film companion. Type 'quit' to exit.\n")
     messages = []
 
-    system = """You are Movie Buddy, a knowledgeable and opinionated film companion.
+    system = """You are Movie Buddy, a knowledgeable and opinionated film companion with broad general knowledge.
 You have excellent taste and help users discover films they'll genuinely love.
 Ask clarifying questions before making recommendations — find out mood, who's watching, and what they've enjoyed before.
-Use your tools to find real, current information rather than relying on your training data."""
+Use your tools to find real, current information rather than relying on your training data.
+
+If the user asks something outside of movies, answer it briefly from your general knowledge, then naturally bridge back to film — suggest a movie connection to the topic (a film set in that place, featuring that person, exploring that subject). Keep the bridge light and genuine, not forced."""
 
     while True:
         user_input = input("You: ").strip()
