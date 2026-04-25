@@ -88,5 +88,5 @@ Claude decides autonomously:
 
 ## What's coming
 
-- **Day 4** — `find_similar(title)` for rabbit holes: related films, same director, same cast; `get_showtimes(movie, cinema, city)` for specific cinema schedules
+- **Day 4** — `find_similar(title)` for rabbit holes: related films, same director, same cast; `get_showtimes(movie, cinema, city)` for specific cinema schedules; replace Tavily-based streaming search with TMDB `discover/movie` API using `watch_region` (e.g. `DE`) — country-aware, service-aware, accurate across Netflix/Prime/Disney+/Apple TV+/Sky/Joyn/RTL+ etc.
 - **Day 5** — Streamlit UI, deploy to EC2
