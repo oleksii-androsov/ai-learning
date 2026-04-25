@@ -36,6 +36,57 @@ tools = [
         }
     },
     {
+        "name": "get_current_listings",
+        "description": "Search for movies currently showing in theaters or recently released on streaming services. Use this when the user wants to know what's available to watch right now.",
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "location": {
+                    "type": "string",
+                    "description": "City or country to check listings for, e.g. 'Frankfurt', 'Germany', 'UK'"
+                },
+                "format": {
+                    "type": "string",
+                    "description": "Where to watch: 'theaters', 'streaming', or 'both'",
+                    "enum": ["theaters", "streaming", "both"]
+                }
+            },
+            "required": []
+        }
+    },
+    {
+        "name": "get_upcoming_listings",
+        "description": "Search for movies coming soon to theaters or streaming. Use this when the user wants to plan ahead or know what's releasing in the coming weeks.",
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "location": {
+                    "type": "string",
+                    "description": "City or country to check listings for, e.g. 'Frankfurt', 'Germany'"
+                },
+                "weeks_ahead": {
+                    "type": "integer",
+                    "description": "How many weeks ahead to look, e.g. 2 for the next two weeks"
+                }
+            },
+            "required": []
+        }
+    },
+    {
+        "name": "get_weather",
+        "description": "Get the weather forecast for a city. Use this to decide whether to recommend a theater visit or a stay-at-home streaming option. If the weather is bad, lean toward streaming suggestions.",
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "city": {
+                    "type": "string",
+                    "description": "The city to get the forecast for, e.g. 'Frankfurt', 'London'"
+                }
+            },
+            "required": ["city"]
+        }
+    },
+    {
         "name": "get_movie_details",
         "description": "Look up structured details about a specific movie by title: rating, runtime, genres, director, top cast, plot summary, and TMDB score. Use this when the user mentions a specific film and you need accurate facts about it. If the title is ambiguous or part of a franchise with multiple entries (e.g. 'Avengers', 'Dune', 'Lord of the Rings'), ask the user to clarify which one they mean before calling this tool.",
         "input_schema": {
@@ -106,11 +157,85 @@ def discover_movies(mood=None, genre=None, who_is_watching=None):
     )
 
 
+def get_current_listings(location=None, format="both"):
+    query_parts = ["movies"]
+    if format == "theaters":
+        query_parts.append("in theaters now")
+    elif format == "streaming":
+        query_parts.append("new on streaming services")
+    else:
+        query_parts.append("in theaters and new on streaming")
+    if location:
+        query_parts.append(location)
+    query_parts.append("2025 2026")
+
+    results = tavily.search(query=" ".join(query_parts), max_results=5)
+    return "\n\n".join(
+        f"Title: {r['title']}\nURL: {r['url']}\nSummary: {r['content']}"
+        for r in results["results"]
+    )
+
+
+def get_upcoming_listings(location=None, weeks_ahead=2):
+    query_parts = ["upcoming movies releasing soon"]
+    if location:
+        query_parts.append(location)
+    query_parts.append(f"next {weeks_ahead} weeks 2025 2026")
+
+    results = tavily.search(query=" ".join(query_parts), max_results=5)
+    return "\n\n".join(
+        f"Title: {r['title']}\nURL: {r['url']}\nSummary: {r['content']}"
+        for r in results["results"]
+    )
+
+
+def get_weather(city):
+    geo = requests.get(
+        "https://geocoding-api.open-meteo.com/v1/search",
+        params={"name": city, "count": 1}
+    ).json()
+
+    if not geo.get("results"):
+        return f"Could not find location: {city}"
+
+    loc = geo["results"][0]
+    forecast = requests.get(
+        "https://api.open-meteo.com/v1/forecast",
+        params={
+            "latitude": loc["latitude"],
+            "longitude": loc["longitude"],
+            "daily": "weathercode,temperature_2m_max,temperature_2m_min,precipitation_sum",
+            "timezone": "auto",
+            "forecast_days": 3,
+        }
+    ).json()
+
+    daily = forecast["daily"]
+    # Weather codes 0-2: clear/partly cloudy, 3+: overcast/rain/snow
+    days = []
+    for i in range(3):
+        code = daily["weathercode"][i]
+        condition = "sunny/clear" if code <= 2 else "cloudy/overcast" if code <= 49 else "rainy/snowy"
+        days.append(
+            f"{daily['time'][i]}: {condition}, "
+            f"{daily['temperature_2m_min'][i]}–{daily['temperature_2m_max'][i]}°C, "
+            f"{daily['precipitation_sum'][i]}mm rain"
+        )
+
+    return f"Weather forecast for {loc['name']}:\n" + "\n".join(days)
+
+
 def run_tool(tool_name, tool_input):
     if tool_name == "discover_movies":
         return discover_movies(**tool_input)
     if tool_name == "get_movie_details":
         return get_movie_details(**tool_input)
+    if tool_name == "get_current_listings":
+        return get_current_listings(**tool_input)
+    if tool_name == "get_upcoming_listings":
+        return get_upcoming_listings(**tool_input)
+    if tool_name == "get_weather":
+        return get_weather(**tool_input)
     return f"Unknown tool: {tool_name}"
 
 
