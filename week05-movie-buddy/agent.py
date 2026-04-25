@@ -1,5 +1,6 @@
 import os
 import requests
+from datetime import date
 from dotenv import load_dotenv
 import anthropic
 from tavily import TavilyClient
@@ -167,7 +168,8 @@ def get_current_listings(location=None, format="both"):
         query_parts.append("in theaters and new on streaming")
     if location:
         query_parts.append(location)
-    query_parts.append("2025 2026")
+    year = date.today().year
+    query_parts.append(f"{year} {year + 1}")
 
     results = tavily.search(query=" ".join(query_parts), max_results=5)
     return "\n\n".join(
@@ -180,7 +182,8 @@ def get_upcoming_listings(location=None, weeks_ahead=2):
     query_parts = ["upcoming movies releasing soon"]
     if location:
         query_parts.append(location)
-    query_parts.append(f"next {weeks_ahead} weeks 2025 2026")
+    year = date.today().year
+    query_parts.append(f"next {weeks_ahead} weeks {year} {year + 1}")
 
     results = tavily.search(query=" ".join(query_parts), max_results=5)
     return "\n\n".join(
