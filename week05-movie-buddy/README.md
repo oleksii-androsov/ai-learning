@@ -58,6 +58,13 @@ Claude decides autonomously:
 
 ## Day-by-day progress
 
+### Day 3 — get_current_listings, get_upcoming_listings, get_weather
+- `get_current_listings(location, format)` — Tavily search for what's in theaters or on streaming right now
+- `get_upcoming_listings(location, weeks_ahead)` — Tavily search for upcoming releases, good for planning ahead
+- `get_weather(city)` — Open-Meteo API (no key needed): geocodes the city, fetches 3-day forecast, maps weather codes to human-readable conditions
+- Agent now combines weather + listings in a single turn: "cloudy but dry → still worth going out, here's what's showing"
+- Gap identified: agent correctly declines to check specific cinema showtimes — needs a dedicated `get_showtimes` tool (planned for Day 4)
+
 ### Day 2 — get_movie_details tool via TMDB
 - Added `get_movie_details(title)` — searches TMDB by title, fetches full details with cast in a single call using `append_to_response=credits`
 - Returns rating, runtime, genres, director, top 5 cast, and plot overview
@@ -81,7 +88,5 @@ Claude decides autonomously:
 
 ## What's coming
 
-- **Day 2** — `get_movie_details(title)` via TMDB: structured metadata (rating, cast, director, runtime, genres)
-- **Day 3** — `get_current_listings` and `get_upcoming_listings` for theater/streaming availability; `get_weather` for theater vs streaming decisions
-- **Day 4** — `find_similar(title)` for rabbit holes: related films, same director, same cast
+- **Day 4** — `find_similar(title)` for rabbit holes: related films, same director, same cast; `get_showtimes(movie, cinema, city)` for specific cinema schedules
 - **Day 5** — Streamlit UI, deploy to EC2
