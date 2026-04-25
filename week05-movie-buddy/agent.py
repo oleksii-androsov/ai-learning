@@ -1,6 +1,6 @@
 import os
 import requests
-from datetime import date
+from datetime import date, timedelta
 from dotenv import load_dotenv
 import anthropic
 from tavily import TavilyClient
@@ -179,11 +179,14 @@ def get_current_listings(location=None, format="both"):
 
 
 def get_upcoming_listings(location=None, weeks_ahead=2):
-    query_parts = ["upcoming movies releasing soon"]
+    today = date.today()
+    until = today + timedelta(weeks=weeks_ahead)
+    query_parts = [
+        "movies releasing in theaters or streaming",
+        f"between {today.strftime('%B %d %Y')} and {until.strftime('%B %d %Y')}"
+    ]
     if location:
         query_parts.append(location)
-    year = date.today().year
-    query_parts.append(f"next {weeks_ahead} weeks {year} {year + 1}")
 
     results = tavily.search(query=" ".join(query_parts), max_results=5)
     return "\n\n".join(
