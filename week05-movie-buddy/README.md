@@ -94,6 +94,10 @@ Claude decides autonomously:
 - **Plain dicts over SDK objects** — assistant message content is converted to plain dicts before appending to the message history, avoiding SDK serialization edge cases.
 - **Tavily over raw web search** — returns clean structured results designed for LLM consumption, not raw HTML.
 
-## What's coming
-
-- **Day 5** — Streamlit UI, deploy to EC2
+### Day 5 — Streamlit UI, EC2 deployment, performance and quality improvements
+- Refactored `agent.py` to expose `process_message(messages)` — shared by both CLI and Streamlit
+- Built `streamlit_app.py` — chat UI with tool call expander showing which tools fired per turn
+- Deployed to EC2 on port 8502 as a systemd service (`movie-buddy.service`), restarted by CI/CD on every push
+- Parallelised TMDB provider lookups with `ThreadPoolExecutor` — 8 sequential HTTP calls → 1 parallel batch, noticeably faster
+- Added FSK age rating to `get_movie_details` via TMDB `release_dates` endpoint — agent now checks suitability for youngest child
+- System prompt improvements: weather consistency (no contradicting advice in same response), style mirroring (matches user's emoji/formality level), theater showtimes only offered for films released in last 8 weeks
