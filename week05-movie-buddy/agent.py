@@ -1,6 +1,7 @@
 import os
 import requests
 from datetime import date, timedelta
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from dotenv import load_dotenv
 import anthropic
 from tavily import TavilyClient
@@ -184,7 +185,7 @@ def get_movie_details(title):
 
     details = requests.get(
         f"{TMDB_BASE}/movie/{movie_id}",
-        params={"api_key": TMDB_API_KEY, "append_to_response": "credits"}
+        params={"api_key": TMDB_API_KEY, "append_to_response": "credits,release_dates"}
     ).json()
 
     director = next(
@@ -194,10 +195,21 @@ def get_movie_details(title):
     cast = ", ".join(m["name"] for m in details["credits"]["cast"][:5])
     genres = ", ".join(g["name"] for g in details["genres"])
 
+    de_release = next(
+        (r for r in details["release_dates"]["results"] if r["iso_3166_1"] == "DE"),
+        None
+    )
+    certification = "Not rated"
+    if de_release:
+        cert = next((d["certification"] for d in de_release["release_dates"] if d["certification"]), None)
+        if cert:
+            certification = f"FSK {cert}"
+
     return (
         f"Title: {details['title']} ({details.get('release_date', '')[:4]})\n"
         f"Rating: {details['vote_average']:.1f}/10 ({details['vote_count']} votes)\n"
         f"Runtime: {details.get('runtime', 'N/A')} min\n"
+        f"Age rating (Germany): {certification}\n"
         f"Genres: {genres}\n"
         f"Director: {director}\n"
         f"Cast: {cast}\n"
@@ -232,13 +244,21 @@ def _get_providers(movie_id, country_code):
 
 
 def _tmdb_movies_to_text(movies, country_code, prefix=""):
+    movies = movies[:8]
+
+    with ThreadPoolExecutor(max_workers=8) as executor:
+        futures = {executor.submit(_get_providers, m["id"], country_code): m for m in movies}
+        providers_map = {}
+        for future in as_completed(futures):
+            movie = futures[future]
+            providers_map[movie["id"]] = future.result()
+
     lines = []
-    for m in movies[:8]:
-        providers = _get_providers(m["id"], country_code)
+    for m in movies:
         lines.append(
             f"Title: {m['title']} ({m.get('release_date', '')[:4]})\n"
             f"Rating: {m['vote_average']:.1f}/10\n"
-            f"Streaming on: {providers}\n"
+            f"Streaming on: {providers_map.get(m['id'], 'unavailable')}\n"
             f"Overview: {m['overview'][:200]}"
         )
     return (prefix + "\n\n" + "\n\n".join(lines)) if lines else "No results found."
@@ -402,11 +422,7 @@ def run_tool(tool_name, tool_input):
     return f"Unknown tool: {tool_name}"
 
 
-def chat():
-    print("Movie Buddy — your personal film companion. Type 'quit' to exit.\n")
-    messages = []
-
-    system = """You are Movie Buddy, a knowledgeable and opinionated film companion with broad general knowledge.
+SYSTEM_PROMPT = """You are Movie Buddy, a knowledgeable and opinionated film companion with broad general knowledge.
 You have excellent taste and help users discover films they'll genuinely love.
 Ask clarifying questions before making recommendations — find out mood, who's watching, and what they've enjoyed before.
 Use your tools to find real, current information rather than relying on your training data.
@@ -417,7 +433,66 @@ When the user specifies recency ("recently", "new", "just came out", "came out l
 
 When the user asks for a specific genre (e.g. nature documentaries), prefer get_current_listings with a genre filter over find_similar — find_similar has no concept of recency and will return older thematically related titles.
 
+Only offer to check theater showtimes for films released within the last 8 weeks. A film from 2023 or 2024 is not in theaters in 2026 — do not suggest checking its showtimes.
+
+When using weather to advise on cinema vs streaming: if it is raining or snowing, clearly recommend staying home. If it is dry (even if cold or grey), state once upfront that either works and why — then stay consistent with that throughout the response. Do not say "great weather for staying in" and then later say "perfect excuse for a cinema trip" in the same response.
+
+Always check the age rating of a film before recommending it to a family with children. The get_movie_details tool returns the FSK/certification rating. A film rated 12+ (FSK 12) is not appropriate for a 7-year-old. Match the rating to the youngest child in the family.
+
+Mirror the user's communication style. If they use emojis, informal language, and exclamation marks, match that energy. If they are terse and formal, dial it back. Don't impose a style — read their messages and adapt.
+
 If the user asks something outside of movies, answer it briefly from your general knowledge, then naturally bridge back to film — suggest a movie connection to the topic (a film set in that place, featuring that person, exploring that subject). Keep the bridge light and genuine, not forced."""
+
+
+def process_message(messages):
+    """Run the agent loop for the current message history.
+    Returns (reply, tool_calls_log) and appends to messages in place."""
+    tool_calls_log = []
+
+    while True:
+        response = client.messages.create(
+            model="claude-sonnet-4-6",
+            max_tokens=1024,
+            system=SYSTEM_PROMPT,
+            tools=tools,
+            messages=messages,
+        )
+
+        assistant_content = []
+        for block in response.content:
+            if block.type == "text":
+                assistant_content.append({"type": "text", "text": block.text})
+            elif block.type == "tool_use":
+                assistant_content.append({
+                    "type": "tool_use",
+                    "id": block.id,
+                    "name": block.name,
+                    "input": block.input,
+                })
+
+        messages.append({"role": "assistant", "content": assistant_content})
+
+        if response.stop_reason == "tool_use":
+            tool_results = []
+            for block in response.content:
+                if block.type == "tool_use":
+                    result = run_tool(block.name, block.input)
+                    tool_calls_log.append({"tool": block.name, "input": block.input})
+                    tool_results.append({
+                        "type": "tool_result",
+                        "tool_use_id": block.id,
+                        "content": result,
+                    })
+            messages.append({"role": "user", "content": tool_results})
+
+        else:
+            reply = next(b.text for b in response.content if hasattr(b, "text"))
+            return reply, tool_calls_log
+
+
+def chat():
+    print("Movie Buddy — your personal film companion. Type 'quit' to exit.\n")
+    messages = []
 
     while True:
         user_input = input("You: ").strip()
@@ -427,51 +502,11 @@ If the user asks something outside of movies, answer it briefly from your genera
             continue
 
         messages.append({"role": "user", "content": user_input})
+        reply, tool_calls = process_message(messages)
 
-        while True:
-            response = client.messages.create(
-                model="claude-sonnet-4-6",
-                max_tokens=1024,
-                system=system,
-                tools=tools,
-                messages=messages,
-            )
-
-            # Convert SDK objects to plain dicts to avoid serialization issues
-            assistant_content = []
-            for block in response.content:
-                if block.type == "text":
-                    assistant_content.append({"type": "text", "text": block.text})
-                elif block.type == "tool_use":
-                    assistant_content.append({
-                        "type": "tool_use",
-                        "id": block.id,
-                        "name": block.name,
-                        "input": block.input,
-                    })
-
-            messages.append({"role": "assistant", "content": assistant_content})
-
-            if response.stop_reason == "tool_use":
-                # Handle ALL tool_use blocks in this response
-                tool_results = []
-                for block in response.content:
-                    if block.type == "tool_use":
-                        result = run_tool(block.name, block.input)
-                        print(f"\n[Tool call: {block.name}({block.input})]")
-                        print(f"[Tool result: {result}]\n")
-                        tool_results.append({
-                            "type": "tool_result",
-                            "tool_use_id": block.id,
-                            "content": result,
-                        })
-
-                messages.append({"role": "user", "content": tool_results})
-
-            else:
-                reply = next(b.text for b in response.content if hasattr(b, "text"))
-                print(f"\nMovie Buddy: {reply}\n")
-                break
+        for tc in tool_calls:
+            print(f"\n[Tool call: {tc['tool']}({tc['input']})]")
+        print(f"\nMovie Buddy: {reply}\n")
 
 
 if __name__ == "__main__":
