@@ -11,6 +11,14 @@ tavily = TavilyClient(api_key=os.environ["TAVILY_API_KEY"])
 TMDB_API_KEY = os.environ["TMDB_API_KEY"]
 TMDB_BASE = "https://api.themoviedb.org/3"
 
+TMDB_GENRES = {
+    "action": 28, "adventure": 12, "animation": 16, "comedy": 35,
+    "documentary": 99, "drama": 18, "family": 10751, "fantasy": 14,
+    "horror": 27, "music": 10402, "mystery": 9648, "romance": 10749,
+    "science fiction": 878, "sci-fi": 878, "thriller": 53, "western": 37,
+}
+
+
 client = anthropic.Anthropic(api_key=os.environ["ANTHROPIC_API_KEY"])
 
 tools = [
@@ -38,18 +46,26 @@ tools = [
     },
     {
         "name": "get_current_listings",
-        "description": "Search for movies currently showing in theaters or recently released on streaming services. Use this when the user wants to know what's available to watch right now.",
+        "description": "Find movies currently in theaters or recently added to streaming services. For streaming, uses country-specific data so results are accurate for the user's region. Use this when the user wants to know what's available right now. If the user asks for more options, increment the page number.",
         "input_schema": {
             "type": "object",
             "properties": {
-                "location": {
+                "country_code": {
                     "type": "string",
-                    "description": "City or country to check listings for, e.g. 'Frankfurt', 'Germany', 'UK'"
+                    "description": "ISO 3166-1 alpha-2 country code, e.g. 'DE' for Germany, 'GB' for UK, 'US' for USA. Infer from the user's location."
                 },
                 "format": {
                     "type": "string",
                     "description": "Where to watch: 'theaters', 'streaming', or 'both'",
                     "enum": ["theaters", "streaming", "both"]
+                },
+                "page": {
+                    "type": "integer",
+                    "description": "Page number for results, default 1. Use 2, 3 etc. when the user asks for more options."
+                },
+                "genre": {
+                    "type": "string",
+                    "description": "Optional genre filter, e.g. 'documentary', 'animation', 'comedy', 'sci-fi'. Use this when the user asks for a specific genre of current or upcoming content."
                 }
             },
             "required": []
@@ -57,20 +73,68 @@ tools = [
     },
     {
         "name": "get_upcoming_listings",
-        "description": "Search for movies coming soon to theaters or streaming. Use this when the user wants to plan ahead or know what's releasing in the coming weeks.",
+        "description": "Find movies coming soon to theaters or streaming. Use this when the user wants to plan ahead. For streaming, returns country-accurate results. If the user asks for more options, increment the page number.",
         "input_schema": {
             "type": "object",
             "properties": {
-                "location": {
+                "country_code": {
                     "type": "string",
-                    "description": "City or country to check listings for, e.g. 'Frankfurt', 'Germany'"
+                    "description": "ISO 3166-1 alpha-2 country code, e.g. 'DE' for Germany, 'GB' for UK. Infer from the user's location."
                 },
                 "weeks_ahead": {
                     "type": "integer",
                     "description": "How many weeks ahead to look, e.g. 2 for the next two weeks"
+                },
+                "page": {
+                    "type": "integer",
+                    "description": "Page number for results, default 1. Use 2, 3 etc. when the user asks for more options."
                 }
             },
             "required": []
+        }
+    },
+    {
+        "name": "find_similar",
+        "description": "Find movies similar to one the user already likes. If no aspect is specified, uses TMDB recommendations based on genre, cast, and themes. If the user specifies a creative aspect — e.g. 'I loved the music', 'same cinematographer', 'same animator' — use that aspect to search instead, as TMDB won't have that data.",
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "title": {
+                    "type": "string",
+                    "description": "The movie the user liked, e.g. 'Dune: Part One'"
+                },
+                "aspect": {
+                    "type": "string",
+                    "description": "Optional: a specific creative angle to match on, e.g. 'Hans Zimmer soundtrack', 'Andreas Deja animation', 'Roger Deakins cinematography'. When provided, a web search is used instead of TMDB."
+                }
+            },
+            "required": ["title"]
+        }
+    },
+    {
+        "name": "get_showtimes",
+        "description": "Look up screening times for a specific movie at a specific cinema. Use this when the user asks about showtimes at a named cinema.",
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "movie": {
+                    "type": "string",
+                    "description": "The movie title to look up showtimes for"
+                },
+                "cinema": {
+                    "type": "string",
+                    "description": "The name of the cinema, e.g. 'Astor Film Lounge MyZeil'"
+                },
+                "city": {
+                    "type": "string",
+                    "description": "The city where the cinema is located"
+                },
+                "date": {
+                    "type": "string",
+                    "description": "Optional: specific date to check, e.g. 'Saturday May 10 2026'. If not provided, returns current or nearest available schedule."
+                }
+            },
+            "required": ["movie", "cinema", "city"]
         }
     },
     {
@@ -158,40 +222,129 @@ def discover_movies(mood=None, genre=None, who_is_watching=None):
     )
 
 
-def get_current_listings(location=None, format="both"):
-    query_parts = ["movies"]
-    if format == "theaters":
-        query_parts.append("in theaters now")
-    elif format == "streaming":
-        query_parts.append("new on streaming services")
-    else:
-        query_parts.append("in theaters and new on streaming")
-    if location:
-        query_parts.append(location)
-    year = date.today().year
-    query_parts.append(f"{year} {year + 1}")
-
-    results = tavily.search(query=" ".join(query_parts), max_results=5)
-    return "\n\n".join(
-        f"Title: {r['title']}\nURL: {r['url']}\nSummary: {r['content']}"
-        for r in results["results"]
-    )
+def _get_providers(movie_id, country_code):
+    r = requests.get(
+        f"{TMDB_BASE}/movie/{movie_id}/watch/providers",
+        params={"api_key": TMDB_API_KEY}
+    ).json()
+    providers = r.get("results", {}).get(country_code, {}).get("flatrate", [])
+    return ", ".join(p["provider_name"] for p in providers) if providers else "unavailable"
 
 
-def get_upcoming_listings(location=None, weeks_ahead=2):
+def _tmdb_movies_to_text(movies, country_code, prefix=""):
+    lines = []
+    for m in movies[:8]:
+        providers = _get_providers(m["id"], country_code)
+        lines.append(
+            f"Title: {m['title']} ({m.get('release_date', '')[:4]})\n"
+            f"Rating: {m['vote_average']:.1f}/10\n"
+            f"Streaming on: {providers}\n"
+            f"Overview: {m['overview'][:200]}"
+        )
+    return (prefix + "\n\n" + "\n\n".join(lines)) if lines else "No results found."
+
+
+def get_current_listings(country_code="DE", format="both", page=1, genre=None):
+    results = []
+    genre_id = TMDB_GENRES.get(genre.lower()) if genre else None
+
+    if format in ("streaming", "both"):
+        today = date.today()
+        params = {
+            "api_key": TMDB_API_KEY,
+            "watch_region": country_code,
+            "with_watch_monetization_types": "flatrate",
+            "primary_release_date.gte": (today - timedelta(days=60)).isoformat(),
+            "primary_release_date.lte": today.isoformat(),
+            "sort_by": "popularity.desc",
+            "language": "en-US",
+            "page": page,
+        }
+        if genre_id:
+            params["with_genres"] = genre_id
+        r = requests.get(f"{TMDB_BASE}/discover/movie", params=params).json()
+        label = f"Streaming now in {country_code}{' — ' + genre if genre else ''} (page {page}):"
+        results.append(_tmdb_movies_to_text(r.get("results", []), country_code, label))
+
+    if format in ("theaters", "both"):
+        year = date.today().year
+        query = f"{genre + ' ' if genre else ''}movies in theaters now {year}"
+        r = tavily.search(query=query, max_results=5)
+        theater_text = "\n\n".join(
+            f"Title: {x['title']}\nSummary: {x['content']}"
+            for x in r["results"]
+        )
+        results.append(f"In theaters:\n\n{theater_text}")
+
+    return "\n\n---\n\n".join(results)
+
+
+def get_upcoming_listings(country_code="DE", weeks_ahead=2, page=1):
     today = date.today()
     until = today + timedelta(weeks=weeks_ahead)
-    query_parts = [
-        "movies releasing in theaters or streaming",
-        f"between {today.strftime('%B %d %Y')} and {until.strftime('%B %d %Y')}"
-    ]
-    if location:
-        query_parts.append(location)
+    results = []
 
-    results = tavily.search(query=" ".join(query_parts), max_results=5)
+    r = requests.get(
+        f"{TMDB_BASE}/discover/movie",
+        params={
+            "api_key": TMDB_API_KEY,
+            "watch_region": country_code,
+            "with_watch_monetization_types": "flatrate",
+            "primary_release_date.gte": today.isoformat(),
+            "primary_release_date.lte": until.isoformat(),
+            "sort_by": "primary_release_date.asc",
+            "language": "en-US",
+            "page": page,
+        }
+    ).json()
+    results.append(_tmdb_movies_to_text(r.get("results", []), country_code, f"Upcoming on streaming in {country_code} (page {page}):"))
+
+    query = f"movies releasing in theaters between {today.strftime('%B %d %Y')} and {until.strftime('%B %d %Y')}"
+    r = tavily.search(query=query, max_results=5)
+    theater_text = "\n\n".join(
+        f"Title: {x['title']}\nSummary: {x['content']}"
+        for x in r["results"]
+    )
+    results.append(f"Upcoming in theaters:\n\n{theater_text}")
+
+    return "\n\n---\n\n".join(results)
+
+
+def find_similar(title, aspect=None):
+    if aspect:
+        query = f"movies with {aspect} similar to {title}"
+        r = tavily.search(query=query, max_results=5)
+        return "\n\n".join(
+            f"Title: {x['title']}\nSummary: {x['content']}"
+            for x in r["results"]
+        )
+
+    search = requests.get(
+        f"{TMDB_BASE}/search/movie",
+        params={"api_key": TMDB_API_KEY, "query": title}
+    ).json()
+
+    if not search.get("results"):
+        return f"Could not find '{title}' on TMDB."
+
+    movie_id = search["results"][0]["id"]
+
+    recs = requests.get(
+        f"{TMDB_BASE}/movie/{movie_id}/recommendations",
+        params={"api_key": TMDB_API_KEY, "language": "en-US"}
+    ).json()
+
+    return _tmdb_movies_to_text(recs.get("results", []), f"Movies similar to '{title}':")
+
+
+def get_showtimes(movie, cinema, city, date=None):
+    query_parts = [movie, "showtimes", cinema, city]
+    if date:
+        query_parts.append(date)
+    r = tavily.search(query=" ".join(query_parts), max_results=3)
     return "\n\n".join(
-        f"Title: {r['title']}\nURL: {r['url']}\nSummary: {r['content']}"
-        for r in results["results"]
+        f"Source: {x['title']}\nURL: {x['url']}\nDetails: {x['content']}"
+        for x in r["results"]
     )
 
 
@@ -242,6 +395,10 @@ def run_tool(tool_name, tool_input):
         return get_upcoming_listings(**tool_input)
     if tool_name == "get_weather":
         return get_weather(**tool_input)
+    if tool_name == "find_similar":
+        return find_similar(**tool_input)
+    if tool_name == "get_showtimes":
+        return get_showtimes(**tool_input)
     return f"Unknown tool: {tool_name}"
 
 
@@ -253,6 +410,12 @@ def chat():
 You have excellent taste and help users discover films they'll genuinely love.
 Ask clarifying questions before making recommendations — find out mood, who's watching, and what they've enjoyed before.
 Use your tools to find real, current information rather than relying on your training data.
+
+When making final recommendations, always include the streaming platform name (e.g. Netflix, Disney+, Amazon Prime) for every title you mention. Never recommend a title without telling the user where to watch it.
+
+When the user specifies recency ("recently", "new", "just came out", "came out lately"), only recommend titles from the last 12 months. If you include an older title, explicitly flag it as older and explain why you're including it anyway. Do not silently include a 2016 film in response to a request for recent content.
+
+When the user asks for a specific genre (e.g. nature documentaries), prefer get_current_listings with a genre filter over find_similar — find_similar has no concept of recency and will return older thematically related titles.
 
 If the user asks something outside of movies, answer it briefly from your general knowledge, then naturally bridge back to film — suggest a movie connection to the topic (a film set in that place, featuring that person, exploring that subject). Keep the bridge light and genuine, not forced."""
 

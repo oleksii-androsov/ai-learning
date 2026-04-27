@@ -58,6 +58,14 @@ Claude decides autonomously:
 
 ## Day-by-day progress
 
+### Day 4 — find_similar, get_showtimes, streaming improvements
+- `find_similar(title, aspect)` — without `aspect`: TMDB `/movie/{id}/recommendations` for thematically similar films; with `aspect` (e.g. "Hans Zimmer soundtrack", "Andreas Deja animation"): Tavily web search for that specific creative angle. Same tool, two data sources.
+- `get_showtimes(movie, cinema, city, date)` — Tavily search for specific cinema schedules including optional date. Tested with Astor Film Lounge MyZeil in Frankfurt.
+- Streaming now uses TMDB `discover/movie` with `watch_region` — country-accurate results across Netflix, Prime, Disney+, Apple TV+ etc. Provider info fetched per title.
+- Added `genre` filter to `get_current_listings` — Claude can now search "nature documentaries streaming now in Germany" using TMDB genre IDs instead of falling back to `find_similar`
+- Added `page` parameter to listing tools — "give me more options" correctly fetches the next page rather than repeating page 1
+- System prompt improvements: always include platform in recommendations; flag titles older than 12 months when user requests recent content
+
 ### Day 3 — get_current_listings, get_upcoming_listings, get_weather
 - `get_current_listings(location, format)` — Tavily search for what's in theaters or on streaming right now
 - `get_upcoming_listings(location, weeks_ahead)` — Tavily search for upcoming releases, good for planning ahead
@@ -88,5 +96,4 @@ Claude decides autonomously:
 
 ## What's coming
 
-- **Day 4** — `find_similar(title)` for rabbit holes: related films, same director, same cast; `get_showtimes(movie, cinema, city)` for specific cinema schedules; replace Tavily-based streaming search with TMDB `discover/movie` API using `watch_region` (e.g. `DE`) — country-aware, service-aware, accurate across Netflix/Prime/Disney+/Apple TV+/Sky/Joyn/RTL+ etc.
 - **Day 5** — Streamlit UI, deploy to EC2
