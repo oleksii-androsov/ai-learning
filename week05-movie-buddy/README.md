@@ -1,4 +1,4 @@
-# Week 5 — Movie Buddy: AI Agent with Tool Use
+# Movie Buddy: AI Agent with Tool Use and Multi-Agent Orchestration
 
 ## What we're building
 
@@ -93,6 +93,14 @@ Claude decides autonomously:
 - **All tool_use blocks handled per response** — Claude can call multiple tools in a single response; we loop over all of them and return all results before Claude continues.
 - **Plain dicts over SDK objects** — assistant message content is converted to plain dicts before appending to the message history, avoiding SDK serialization edge cases.
 - **Tavily over raw web search** — returns clean structured results designed for LLM consumption, not raw HTML.
+
+### Week 6, Day 1 — Multi-agent orchestration
+- Redesigned from single agent to orchestrator + four specialists: Tracker, Explorer, Fact-Checker, Planner
+- Orchestrator has no tools — pure reasoning. It decides which specialist to call, what to ask, and synthesizes the final response
+- Each specialist runs its own tool loop with a focused subset of tools and a tight system prompt
+- Specialists are the orchestrator's "tools" — same tool use loop pattern, one level up
+- `multi_agent.py` imports tool functions from `agent.py` — no duplication
+- `streamlit_multi.py` — new UI pointing at the orchestrator, shows which specialists were consulted per turn
 
 ### Day 5 — Streamlit UI, EC2 deployment, performance and quality improvements
 - Refactored `agent.py` to expose `process_message(messages)` — shared by both CLI and Streamlit
