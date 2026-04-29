@@ -117,13 +117,13 @@ Never state or imply a film's release status from memory — always verify via T
 Always include streaming platform names in recommendations. Mirror the user's communication style."""
 
 
-def _run_specialist(system_prompt, tools, request):
+def _run_specialist(system_prompt, tools, request, model="claude-sonnet-4-6"):
     """Spin up a specialist agent, run its tool loop, return its answer."""
     messages = [{"role": "user", "content": request}]
 
     while True:
         response = client.messages.create(
-            model="claude-haiku-4-5-20251001",
+            model=model,
             max_tokens=1024,
             system=system_prompt,
             tools=tools,
@@ -166,13 +166,13 @@ def _call_specialist(name, request):
 
     def _run():
         if name == "ask_tracker":
-            return _run_specialist(TRACKER_PROMPT, TRACKER_TOOLS, request)
+            return _run_specialist(TRACKER_PROMPT, TRACKER_TOOLS, request, model="claude-haiku-4-5-20251001")
         if name == "ask_explorer":
-            return _run_specialist(EXPLORER_PROMPT, EXPLORER_TOOLS, request)
+            return _run_specialist(EXPLORER_PROMPT, EXPLORER_TOOLS, request, model="claude-sonnet-4-6")
         if name == "ask_fact_checker":
-            return _run_specialist(FACTCHECK_PROMPT, FACTCHECK_TOOLS, request)
+            return _run_specialist(FACTCHECK_PROMPT, FACTCHECK_TOOLS, request, model="claude-haiku-4-5-20251001")
         if name == "ask_planner":
-            return _run_specialist(PLANNER_PROMPT, PLANNER_TOOLS, request)
+            return _run_specialist(PLANNER_PROMPT, PLANNER_TOOLS, request, model="claude-sonnet-4-6")
         return f"Unknown specialist: {name}"
 
     if LLMOBS_ENABLED:
