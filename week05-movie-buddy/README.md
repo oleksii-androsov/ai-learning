@@ -94,6 +94,14 @@ Claude decides autonomously:
 - **Plain dicts over SDK objects** — assistant message content is converted to plain dicts before appending to the message history, avoiding SDK serialization edge cases.
 - **Tavily over raw web search** — returns clean structured results designed for LLM consumption, not raw HTML.
 
+### Week 6, Day 2 — Parallel execution, model routing, Datadog LLM Observability, HTTPS
+- Parallel specialist execution using `ThreadPoolExecutor` — independent specialists fire simultaneously, total latency = max(individual), not sum
+- Per-specialist timing visible in Streamlit expander and console
+- Datadog LLM Observability instrumentation — `LLMObs.workflow` spans for orchestrator, `LLMObs.agent` spans for each specialist, auto-instrumented Anthropic API calls as child spans
+- Full trace waterfall visible in Datadog: workflow → specialist agents → LLM calls, with token counts, cost, and latency per span
+- Model routing: Haiku for Fact-Checker (structured lookups), Sonnet for Tracker/Explorer/Planner/Orchestrator (reasoning-heavy)
+- nginx reverse proxy + Let's Encrypt SSL — app live at **https://movie-buddy.app**
+
 ### Week 6, Day 1 — Multi-agent orchestration
 - Redesigned from single agent to orchestrator + four specialists: Tracker, Explorer, Fact-Checker, Planner
 - Orchestrator has no tools — pure reasoning. It decides which specialist to call, what to ask, and synthesizes the final response
