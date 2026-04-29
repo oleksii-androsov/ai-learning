@@ -374,36 +374,25 @@ def get_showtimes(movie, cinema, city, date=None):
 
 
 def get_weather(city, dates=None):
-    print(f"[get_weather] city={city!r} dates={dates!r}")
-    try:
-        geo = requests.get(
-            "https://geocoding-api.open-meteo.com/v1/search",
-            params={"name": city, "count": 1}
-        ).json()
-        print(f"[get_weather] geocoding result: {geo}")
-    except Exception as e:
-        return f"Geocoding failed: {e}"
+    geo = requests.get(
+        "https://geocoding-api.open-meteo.com/v1/search",
+        params={"name": city, "count": 1}
+    ).json()
 
     if not geo.get("results"):
         return f"Could not find location: {city}"
 
     loc = geo["results"][0]
-    print(f"[get_weather] using: {loc['name']} ({loc['latitude']}, {loc['longitude']})")
-
-    try:
-        forecast = requests.get(
-            "https://api.open-meteo.com/v1/forecast",
-            params={
-                "latitude": loc["latitude"],
-                "longitude": loc["longitude"],
-                "daily": "weathercode,temperature_2m_max,temperature_2m_min,precipitation_sum",
-                "timezone": "auto",
-                "forecast_days": 7,
-            }
-        ).json()
-        print(f"[get_weather] forecast dates available: {forecast.get('daily', {}).get('time', [])}")
-    except Exception as e:
-        return f"Forecast fetch failed: {e}"
+    forecast = requests.get(
+        "https://api.open-meteo.com/v1/forecast",
+        params={
+            "latitude": loc["latitude"],
+            "longitude": loc["longitude"],
+            "daily": "weathercode,temperature_2m_max,temperature_2m_min,precipitation_sum",
+            "timezone": "auto",
+            "forecast_days": 7,
+        }
+    ).json()
 
     daily = forecast["daily"]
     days = []
@@ -419,7 +408,7 @@ def get_weather(city, dates=None):
         )
 
     if not days:
-        return f"No forecast available for {loc['name']} on requested dates {dates}. Available dates: {daily['time']}"
+        return f"No forecast available for {loc['name']} on requested dates. Available: {daily['time']}"
 
     label = f"Weather for {loc['name']}"
     if dates:
