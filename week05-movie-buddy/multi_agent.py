@@ -1,5 +1,7 @@
 import sys
 import os
+import time
+from concurrent.futures import ThreadPoolExecutor, as_completed
 sys.path.insert(0, os.path.dirname(__file__))
 
 from agent import client, run_tool, tools as all_tools
@@ -151,21 +153,28 @@ def _run_specialist(system_prompt, tools, request):
 
 
 def _call_specialist(name, request):
+    start = time.time()
+    print(f"[{name}] started")
     if name == "ask_tracker":
-        return _run_specialist(TRACKER_PROMPT, TRACKER_TOOLS, request)
-    if name == "ask_explorer":
-        return _run_specialist(EXPLORER_PROMPT, EXPLORER_TOOLS, request)
-    if name == "ask_fact_checker":
-        return _run_specialist(FACTCHECK_PROMPT, FACTCHECK_TOOLS, request)
-    if name == "ask_planner":
-        return _run_specialist(PLANNER_PROMPT, PLANNER_TOOLS, request)
-    return f"Unknown specialist: {name}"
+        result = _run_specialist(TRACKER_PROMPT, TRACKER_TOOLS, request)
+    elif name == "ask_explorer":
+        result = _run_specialist(EXPLORER_PROMPT, EXPLORER_TOOLS, request)
+    elif name == "ask_fact_checker":
+        result = _run_specialist(FACTCHECK_PROMPT, FACTCHECK_TOOLS, request)
+    elif name == "ask_planner":
+        result = _run_specialist(PLANNER_PROMPT, PLANNER_TOOLS, request)
+    else:
+        result = f"Unknown specialist: {name}"
+    elapsed = round(time.time() - start, 1)
+    print(f"[{name}] finished in {elapsed}s")
+    return result, elapsed
 
 
 def process_message(messages):
     """Run one orchestrator turn. Appends to messages in place.
-    Returns (reply, specialist_calls_log)."""
+    Returns (reply, specialist_calls_log, total_specialist_elapsed_s)."""
     calls_log = []
+    total_elapsed = None
 
     while True:
         response = client.messages.create(
@@ -191,20 +200,36 @@ def process_message(messages):
         messages.append({"role": "assistant", "content": assistant_content})
 
         if response.stop_reason == "tool_use":
+            tool_use_blocks = [b for b in response.content if b.type == "tool_use"]
+
+            # Specialists in the same orchestrator response are independent by design —
+            # the orchestrator only batches calls it can resolve simultaneously.
+            # We parallelise them here to reduce latency.
+            parallel_start = time.time()
+            with ThreadPoolExecutor(max_workers=len(tool_use_blocks)) as executor:
+                futures = {
+                    executor.submit(_call_specialist, block.name, block.input["request"]): block
+                    for block in tool_use_blocks
+                }
+                results = {futures[f].id: f.result() for f in as_completed(futures)}
+            total_elapsed = round(time.time() - parallel_start, 1)
+            print(f"All specialists finished in {total_elapsed}s (parallel)")
+
+            # Preserve original order when building tool_results so IDs match correctly
             tool_results = []
-            for block in response.content:
-                if block.type == "tool_use":
-                    result = _call_specialist(block.name, block.input["request"])
-                    calls_log.append({
-                        "specialist": block.name.replace("ask_", "").replace("_", "-").title(),
-                        "request": block.input["request"],
-                    })
-                    tool_results.append({
-                        "type": "tool_result",
-                        "tool_use_id": block.id,
-                        "content": result,
-                    })
+            for block in tool_use_blocks:
+                result, elapsed = results[block.id]
+                calls_log.append({
+                    "specialist": block.name.replace("ask_", "").replace("_", "-").title(),
+                    "request": block.input["request"],
+                    "elapsed_s": elapsed,
+                })
+                tool_results.append({
+                    "type": "tool_result",
+                    "tool_use_id": block.id,
+                    "content": result,
+                })
             messages.append({"role": "user", "content": tool_results})
         else:
             reply = next(b.text for b in response.content if hasattr(b, "text"))
-            return reply, calls_log
+            return reply, calls_log, total_elapsed

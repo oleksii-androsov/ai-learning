@@ -31,11 +31,14 @@ if prompt := st.chat_input("Ask about movies..."):
 
     with st.chat_message("assistant"):
         with st.spinner("Consulting the team..."):
-            reply, calls = process_message(st.session_state.messages)
+            reply, calls, total_elapsed = process_message(st.session_state.messages)
 
         st.markdown(reply)
 
         if calls:
-            with st.expander(f"🤖 {len(calls)} specialist(s) consulted"):
+            header = f"🤖 {len(calls)} specialist(s) consulted"
+            if total_elapsed is not None:
+                header += f" · {total_elapsed}s total"
+            with st.expander(header):
                 for c in calls:
-                    st.caption(f"**{c['specialist']}** — {c['request']}")
+                    st.caption(f"**{c['specialist']}** ({c.get('elapsed_s', '?')}s) — {c['request']}")
