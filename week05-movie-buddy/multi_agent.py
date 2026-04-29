@@ -6,6 +6,12 @@ sys.path.insert(0, os.path.dirname(__file__))
 
 from agent import client, run_tool, tools as all_tools
 
+try:
+    from ddtrace.llmobs import LLMObs
+    LLMOBS_ENABLED = True
+except ImportError:
+    LLMOBS_ENABLED = False
+
 # Pull each specialist's tools from the master list by name
 def _tools_by_name(*names):
     return [t for t in all_tools if t["name"] in names]
@@ -155,16 +161,27 @@ def _run_specialist(system_prompt, tools, request):
 def _call_specialist(name, request):
     start = time.time()
     print(f"[{name}] started")
-    if name == "ask_tracker":
-        result = _run_specialist(TRACKER_PROMPT, TRACKER_TOOLS, request)
-    elif name == "ask_explorer":
-        result = _run_specialist(EXPLORER_PROMPT, EXPLORER_TOOLS, request)
-    elif name == "ask_fact_checker":
-        result = _run_specialist(FACTCHECK_PROMPT, FACTCHECK_TOOLS, request)
-    elif name == "ask_planner":
-        result = _run_specialist(PLANNER_PROMPT, PLANNER_TOOLS, request)
+    label = name.replace("ask_", "").replace("_", "-").title()
+
+    def _run():
+        if name == "ask_tracker":
+            return _run_specialist(TRACKER_PROMPT, TRACKER_TOOLS, request)
+        if name == "ask_explorer":
+            return _run_specialist(EXPLORER_PROMPT, EXPLORER_TOOLS, request)
+        if name == "ask_fact_checker":
+            return _run_specialist(FACTCHECK_PROMPT, FACTCHECK_TOOLS, request)
+        if name == "ask_planner":
+            return _run_specialist(PLANNER_PROMPT, PLANNER_TOOLS, request)
+        return f"Unknown specialist: {name}"
+
+    if LLMOBS_ENABLED:
+        with LLMObs.agent(name=label, model_name="claude-sonnet-4-6", model_provider="anthropic") as span:
+            LLMObs.annotate(span, input_data=[{"role": "user", "content": request}])
+            result = _run()
+            LLMObs.annotate(span, output_data=[{"role": "assistant", "content": result}])
     else:
-        result = f"Unknown specialist: {name}"
+        result = _run()
+
     elapsed = round(time.time() - start, 1)
     print(f"[{name}] finished in {elapsed}s")
     return result, elapsed
@@ -175,6 +192,17 @@ def process_message(messages):
     Returns (reply, specialist_calls_log, total_specialist_elapsed_s)."""
     calls_log = []
     total_elapsed = None
+    user_msg = next(
+        (m["content"] for m in reversed(messages)
+         if m["role"] == "user" and isinstance(m.get("content"), str)),
+        ""
+    )
+
+    if LLMOBS_ENABLED:
+        workflow_span = LLMObs.start_span(span_type="workflow", name="Movie Buddy")
+        LLMObs.annotate(workflow_span, input_data=[{"role": "user", "content": user_msg}])
+    else:
+        workflow_span = None
 
     while True:
         response = client.messages.create(
@@ -232,4 +260,7 @@ def process_message(messages):
             messages.append({"role": "user", "content": tool_results})
         else:
             reply = next(b.text for b in response.content if hasattr(b, "text"))
+            if LLMOBS_ENABLED and workflow_span:
+                LLMObs.annotate(workflow_span, output_data=[{"role": "assistant", "content": reply}])
+                workflow_span.finish()
             return reply, calls_log, total_elapsed
