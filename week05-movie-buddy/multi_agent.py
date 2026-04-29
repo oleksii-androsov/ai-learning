@@ -205,63 +205,65 @@ def process_message(messages):
             LLMObs.annotate(workflow_span, input_data=[{"role": "user", "content": user_msg}])
 
         reply = None
-        while True:        response = client.messages.create(
-            model="claude-sonnet-4-6",
-            max_tokens=2048,
-            system=ORCHESTRATOR_PROMPT,
-            tools=orchestrator_tools,
-            messages=messages,
-        )
+        while True:
+            response = client.messages.create(
+                model="claude-sonnet-4-6",
+                max_tokens=2048,
+                system=ORCHESTRATOR_PROMPT,
+                tools=orchestrator_tools,
+                messages=messages,
+            )
 
-        assistant_content = []
-        for block in response.content:
-            if block.type == "text":
-                assistant_content.append({"type": "text", "text": block.text})
-            elif block.type == "tool_use":
-                assistant_content.append({
-                    "type": "tool_use",
-                    "id": block.id,
-                    "name": block.name,
-                    "input": block.input,
-                })
+            assistant_content = []
+            for block in response.content:
+                if block.type == "text":
+                    assistant_content.append({"type": "text", "text": block.text})
+                elif block.type == "tool_use":
+                    assistant_content.append({
+                        "type": "tool_use",
+                        "id": block.id,
+                        "name": block.name,
+                        "input": block.input,
+                    })
 
-        messages.append({"role": "assistant", "content": assistant_content})
+            messages.append({"role": "assistant", "content": assistant_content})
 
-        if response.stop_reason == "tool_use":
-            tool_use_blocks = [b for b in response.content if b.type == "tool_use"]
+            if response.stop_reason == "tool_use":
+                tool_use_blocks = [b for b in response.content if b.type == "tool_use"]
 
-            # Specialists in the same orchestrator response are independent by design —
-            # the orchestrator only batches calls it can resolve simultaneously.
-            # We parallelise them here to reduce latency.
-            parallel_start = time.time()
-            with ThreadPoolExecutor(max_workers=len(tool_use_blocks)) as executor:
-                futures = {
-                    executor.submit(_call_specialist, block.name, block.input["request"]): block
-                    for block in tool_use_blocks
-                }
-                results = {futures[f].id: f.result() for f in as_completed(futures)}
-            total_elapsed = round(time.time() - parallel_start, 1)
-            print(f"All specialists finished in {total_elapsed}s (parallel)")
+                # Specialists in the same orchestrator response are independent by design —
+                # the orchestrator only batches calls it can resolve simultaneously.
+                # We parallelise them here to reduce latency.
+                parallel_start = time.time()
+                with ThreadPoolExecutor(max_workers=len(tool_use_blocks)) as executor:
+                    futures = {
+                        executor.submit(_call_specialist, block.name, block.input["request"]): block
+                        for block in tool_use_blocks
+                    }
+                    results = {futures[f].id: f.result() for f in as_completed(futures)}
+                total_elapsed = round(time.time() - parallel_start, 1)
+                print(f"All specialists finished in {total_elapsed}s (parallel)")
 
-            # Preserve original order when building tool_results so IDs match correctly
-            tool_results = []
-            for block in tool_use_blocks:
-                result, elapsed = results[block.id]
-                calls_log.append({
-                    "specialist": block.name.replace("ask_", "").replace("_", "-").title(),
-                    "request": block.input["request"],
-                    "elapsed_s": elapsed,
-                })
-                tool_results.append({
-                    "type": "tool_result",
-                    "tool_use_id": block.id,
-                    "content": result,
-                })
-            messages.append({"role": "user", "content": tool_results})
-        else:
-            reply = next(b.text for b in response.content if hasattr(b, "text"))
-            if LLMOBS_ENABLED and workflow_span is not None:
-                LLMObs.annotate(workflow_span, output_data=[{"role": "assistant", "content": reply}])
-            break
+                # Preserve original order when building tool_results so IDs match correctly
+                tool_results = []
+                for block in tool_use_blocks:
+                    result, elapsed = results[block.id]
+                    calls_log.append({
+                        "specialist": block.name.replace("ask_", "").replace("_", "-").title(),
+                        "request": block.input["request"],
+                        "elapsed_s": elapsed,
+                    })
+                    tool_results.append({
+                        "type": "tool_result",
+                        "tool_use_id": block.id,
+                        "content": result,
+                    })
+                messages.append({"role": "user", "content": tool_results})
+
+            else:
+                reply = next(b.text for b in response.content if hasattr(b, "text"))
+                if LLMOBS_ENABLED and workflow_span is not None:
+                    LLMObs.annotate(workflow_span, output_data=[{"role": "assistant", "content": reply}])
+                break
 
     return reply, calls_log, total_elapsed
