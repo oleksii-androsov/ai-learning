@@ -146,7 +146,7 @@ tools = [
             "properties": {
                 "city": {
                     "type": "string",
-                    "description": "City with country for precision, e.g. 'Frankfurt, Germany', 'London, UK'"
+                    "description": "Full official city name to avoid ambiguity, e.g. 'Frankfurt am Main' not 'Frankfurt', 'London', 'New York'"
                 },
                 "dates": {
                     "type": "array",
