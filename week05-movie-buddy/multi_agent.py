@@ -176,7 +176,7 @@ def _call_specialist(name, request):
         return f"Unknown specialist: {name}"
 
     if LLMOBS_ENABLED:
-        with LLMObs.agent(name=label, model_name="claude-sonnet-4-6", model_provider="anthropic") as span:
+        with LLMObs.agent(name=label) as span:
             LLMObs.annotate(span, input_data=[{"role": "user", "content": request}])
             result = _run()
             LLMObs.annotate(span, output_data=[{"role": "assistant", "content": result}])
