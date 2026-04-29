@@ -50,7 +50,7 @@ jobs:
           script: |
             cd /home/ubuntu/ai-learning
             git pull
-            sudo systemctl restart rag-api rag-streamlit movie-buddy
+            sudo systemctl restart rag-api rag-streamlit movie-buddy movie-buddy-multi
             for i in {1..12}; do
               curl -sf http://localhost:8000/health && break
               echo "Waiting for API to start (attempt $i/12)..."
