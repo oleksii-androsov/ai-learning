@@ -2,6 +2,7 @@ import sys
 import os
 import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
+from contextlib import nullcontext
 sys.path.insert(0, os.path.dirname(__file__))
 
 from agent import client, run_tool, tools as all_tools
@@ -198,14 +199,13 @@ def process_message(messages):
         ""
     )
 
-    if LLMOBS_ENABLED:
-        workflow_span = LLMObs.start_span(span_type="workflow", name="Movie Buddy")
-        LLMObs.annotate(workflow_span, input_data=[{"role": "user", "content": user_msg}])
-    else:
-        workflow_span = None
+    ctx = LLMObs.workflow(name="Movie Buddy") if LLMOBS_ENABLED else nullcontext()
+    with ctx as workflow_span:
+        if LLMOBS_ENABLED:
+            LLMObs.annotate(workflow_span, input_data=[{"role": "user", "content": user_msg}])
 
-    while True:
-        response = client.messages.create(
+        reply = None
+        while True:        response = client.messages.create(
             model="claude-sonnet-4-6",
             max_tokens=2048,
             system=ORCHESTRATOR_PROMPT,
@@ -260,7 +260,8 @@ def process_message(messages):
             messages.append({"role": "user", "content": tool_results})
         else:
             reply = next(b.text for b in response.content if hasattr(b, "text"))
-            if LLMOBS_ENABLED and workflow_span:
+            if LLMOBS_ENABLED and workflow_span is not None:
                 LLMObs.annotate(workflow_span, output_data=[{"role": "assistant", "content": reply}])
-                workflow_span.finish()
-            return reply, calls_log, total_elapsed
+            break
+
+    return reply, calls_log, total_elapsed
