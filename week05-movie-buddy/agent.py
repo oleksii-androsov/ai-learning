@@ -140,13 +140,18 @@ tools = [
     },
     {
         "name": "get_weather",
-        "description": "Get the weather forecast for a city. Use this to decide whether to recommend a theater visit or a stay-at-home streaming option. If the weather is bad, lean toward streaming suggestions.",
+        "description": "Get the weather forecast for a city on a specific date or range of dates. Use this to advise on cinema vs streaming. Always pass city with country to avoid ambiguity (e.g. 'Frankfurt, Germany' not just 'Frankfurt'). If the user mentions a specific day or weekend, pass the corresponding date(s) in YYYY-MM-DD format.",
         "input_schema": {
             "type": "object",
             "properties": {
                 "city": {
                     "type": "string",
-                    "description": "The city to get the forecast for, e.g. 'Frankfurt', 'London'"
+                    "description": "City with country for precision, e.g. 'Frankfurt, Germany', 'London, UK'"
+                },
+                "dates": {
+                    "type": "array",
+                    "items": {"type": "string"},
+                    "description": "Specific dates to return in YYYY-MM-DD format, e.g. ['2026-05-02', '2026-05-03'] for a weekend. If omitted, returns the full 7-day forecast."
                 }
             },
             "required": ["city"]
@@ -368,7 +373,7 @@ def get_showtimes(movie, cinema, city, date=None):
     )
 
 
-def get_weather(city):
+def get_weather(city, dates=None):
     geo = requests.get(
         "https://geocoding-api.open-meteo.com/v1/search",
         params={"name": city, "count": 1}
@@ -385,14 +390,15 @@ def get_weather(city):
             "longitude": loc["longitude"],
             "daily": "weathercode,temperature_2m_max,temperature_2m_min,precipitation_sum",
             "timezone": "auto",
-            "forecast_days": 3,
+            "forecast_days": 7,
         }
     ).json()
 
     daily = forecast["daily"]
-    # Weather codes 0-2: clear/partly cloudy, 3+: overcast/rain/snow
     days = []
-    for i in range(3):
+    for i in range(len(daily["time"])):
+        if dates and daily["time"][i] not in dates:
+            continue
         code = daily["weathercode"][i]
         condition = "sunny/clear" if code <= 2 else "cloudy/overcast" if code <= 49 else "rainy/snowy"
         days.append(
@@ -401,7 +407,13 @@ def get_weather(city):
             f"{daily['precipitation_sum'][i]}mm rain"
         )
 
-    return f"Weather forecast for {loc['name']}:\n" + "\n".join(days)
+    if not days:
+        return f"No forecast available for {loc['name']} on the requested dates."
+
+    label = f"Weather for {loc['name']}"
+    if dates:
+        label += f" on {', '.join(dates)}"
+    return label + ":\n" + "\n".join(days)
 
 
 def run_tool(tool_name, tool_input):

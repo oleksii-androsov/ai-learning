@@ -11,21 +11,29 @@ st.caption("Tracker · Explorer · Fact-Checker · Planner")
 
 if "messages" not in st.session_state:
     st.session_state.messages = []
+if "display_history" not in st.session_state:
+    st.session_state.display_history = []
 
-for message in st.session_state.messages:
-    role = message["role"]
-    content = message["content"]
-    if role == "user" and isinstance(content, str):
-        with st.chat_message("user"):
-            st.markdown(content)
-    elif role == "assistant" and isinstance(content, list):
-        text = next((b["text"] for b in content if b.get("type") == "text"), None)
-        if text:
-            with st.chat_message("assistant"):
-                st.markdown(text)
+
+def render_expander(calls, total_elapsed, key):
+    header = f"🤖 {len(calls)} specialist(s) consulted"
+    if total_elapsed is not None:
+        header += f" · {total_elapsed}s total"
+    with st.expander(header, key=key):
+        for c in calls:
+            st.caption(f"**{c['specialist']}** ({c.get('elapsed_s', '?')}s) — {c['request']}")
+
+
+for i, entry in enumerate(st.session_state.display_history):
+    with st.chat_message(entry["role"]):
+        st.markdown(entry["content"])
+    if entry.get("calls"):
+        render_expander(entry["calls"], entry.get("total_elapsed"), key=f"expander_{i}")
 
 if prompt := st.chat_input("Ask about movies..."):
     st.session_state.messages.append({"role": "user", "content": prompt})
+    st.session_state.display_history.append({"role": "user", "content": prompt})
+
     with st.chat_message("user"):
         st.markdown(prompt)
 
@@ -36,9 +44,11 @@ if prompt := st.chat_input("Ask about movies..."):
         st.markdown(reply)
 
         if calls:
-            header = f"🤖 {len(calls)} specialist(s) consulted"
-            if total_elapsed is not None:
-                header += f" · {total_elapsed}s total"
-            with st.expander(header):
-                for c in calls:
-                    st.caption(f"**{c['specialist']}** ({c.get('elapsed_s', '?')}s) — {c['request']}")
+            render_expander(calls, total_elapsed, key=f"expander_{len(st.session_state.display_history)}")
+
+    st.session_state.display_history.append({
+        "role": "assistant",
+        "content": reply,
+        "calls": calls,
+        "total_elapsed": total_elapsed,
+    })
