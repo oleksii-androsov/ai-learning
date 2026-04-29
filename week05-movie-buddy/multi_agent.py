@@ -166,7 +166,7 @@ def _call_specialist(name, request):
 
     def _run():
         if name == "ask_tracker":
-            return _run_specialist(TRACKER_PROMPT, TRACKER_TOOLS, request, model="claude-haiku-4-5-20251001")
+            return _run_specialist(TRACKER_PROMPT, TRACKER_TOOLS, request, model="claude-sonnet-4-6")
         if name == "ask_explorer":
             return _run_specialist(EXPLORER_PROMPT, EXPLORER_TOOLS, request, model="claude-sonnet-4-6")
         if name == "ask_fact_checker":
