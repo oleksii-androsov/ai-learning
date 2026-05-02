@@ -1,5 +1,7 @@
 # Movie Buddy: AI Agent with Tool Use and Multi-Agent Orchestration
 
+**Live demo:** https://movie-buddy.app
+
 ## What we're building
 
 A conversational movie recommendation agent that uses real-time tools to give personalised, current suggestions — not just what Claude knows from training data. The agent asks the right questions, searches the web, fetches movie details, and reasons across multiple sources before making a recommendation.
