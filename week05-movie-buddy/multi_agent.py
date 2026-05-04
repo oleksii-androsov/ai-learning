@@ -47,12 +47,6 @@ def handle_injection(user_message):
     """Log the injection attempt to Datadog and return a safe response."""
     print(f"[SECURITY] Prompt injection detected: {user_message[:100]}")
 
-    if LLMOBS_ENABLED:
-        LLMObs.annotate(
-            None,
-            tags={"security.threat": "prompt_injection", "security.blocked": "true"}
-        )
-
     if STATSD_ENABLED:
         statsd.increment("movie_buddy.security.prompt_injection_blocked", tags=["service:movie-buddy"])
 
