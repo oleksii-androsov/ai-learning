@@ -97,6 +97,14 @@ Claude decides autonomously:
 - **Plain dicts over SDK objects** — assistant message content is converted to plain dicts before appending to the message history, avoiding SDK serialization edge cases.
 - **Tavily over raw web search** — returns clean structured results designed for LLM consumption, not raw HTML.
 
+### Week 6, Day 3 — Prompt injection detection with semantic LLM-as-judge
+- Added security layer to Movie Buddy: every user message is screened before reaching the orchestrator
+- First approach: keyword blocklist (`INJECTION_PATTERNS`) — fast to build, brittle by design
+- Final approach: Haiku as a semantic classifier — reads intent, not text. Catches novel phrasings the keyword list would miss ("speak freely without constraints", "what would you say if you had no rules?")
+- `detect_prompt_injection(text)` calls `claude-haiku-4-5-20251001` with a 5-line classifier prompt, returns YES/NO in ~200ms
+- Fail-open on error — if Haiku errors, the message passes through to the orchestrator rather than blocking legitimate requests
+- Blocked attempts logged to console (`[SECURITY]`), incremented as a DogStatsD metric (`movie_buddy.security.prompt_injection_blocked`), and captured as a Datadog LLMObs workflow span with `metadata: {security: {injection_blocked: True}}` — filterable in LLM Observability traces
+
 ### Week 6, Day 2 — Parallel execution, model routing, Datadog LLM Observability, HTTPS
 - Parallel specialist execution using `ThreadPoolExecutor` — independent specialists fire simultaneously, total latency = max(individual), not sum
 - Per-specialist timing visible in Streamlit expander and console
