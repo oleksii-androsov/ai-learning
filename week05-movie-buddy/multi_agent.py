@@ -238,12 +238,19 @@ def process_message(messages):
         ""
     )
 
-    if detect_prompt_injection(user_msg):
-        reply = handle_injection(user_msg)
-        return reply, calls_log, total_elapsed
-
     ctx = LLMObs.workflow(name="Movie Buddy") if LLMOBS_ENABLED else nullcontext()
     with ctx as workflow_span:
+        if detect_prompt_injection(user_msg):
+            reply = handle_injection(user_msg)
+            if LLMOBS_ENABLED and workflow_span is not None:
+                LLMObs.annotate(
+                    workflow_span,
+                    input_data=[{"role": "user", "content": user_msg}],
+                    output_data=[{"role": "assistant", "content": reply}],
+                    metadata={"security": {"injection_blocked": True}},
+                )
+            return reply, calls_log, total_elapsed
+
         if LLMOBS_ENABLED:
             LLMObs.annotate(workflow_span, input_data=[{"role": "user", "content": user_msg}])
 
