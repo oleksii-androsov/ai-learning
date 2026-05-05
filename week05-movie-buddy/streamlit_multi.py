@@ -141,7 +141,7 @@ if not st.session_state.display_history and not st.session_state.pending_prompt:
 # Render conversation history
 for i, entry in enumerate(st.session_state.display_history):
     with st.chat_message(entry["role"]):
-        if entry["role"] == "assistant" and entry.get("calls"):
+        if entry["role"] == "assistant":
             render_reply(entry["content"], entry.get("posters", {}))
         else:
             st.markdown(entry["content"])
