@@ -83,8 +83,7 @@ def _tmdb_verified(query):
             return None
         top = results[0]
         result_title = top.get("title", "").lower()
-        query_lower  = query.lower()
-        # Accept only if title closely matches and film has real audience data
+        query_lower  = re.sub(r'\s*\(\d{4}\)\s*$', '', query).lower().strip()
         title_match = (
             result_title == query_lower or
             query_lower in result_title or
@@ -97,26 +96,38 @@ def _tmdb_verified(query):
     return None
 
 
-def fetch_posters(text):
-    """Extract bold candidates, verify via TMDB, return {title: url} for ≤3 real movies."""
-    if not TMDB_API_KEY:
-        return {}
-    candidates = [c for c in re.findall(r'\*\*([^*]{2,50})\*\*', text) if _looks_like_title(c)]
-    if not candidates:
-        return {}
-    # Deduplicate preserving order
+def _extract_candidates(text):
+    """Extract title candidates from bold text and markdown headings."""
+    bold     = re.findall(r'\*\*([^*]{2,50})\*\*', text)
+    headings = re.findall(r'^#{1,3}\s+[\W_]*([A-Z][^\n]{1,50})', text, re.MULTILINE)
     seen, unique = set(), []
-    for c in candidates:
-        if c not in seen:
+    for c in bold + headings:
+        c = c.strip()
+        if c not in seen and _looks_like_title(c):
             seen.add(c)
             unique.append(c)
-    # Only attempt verification if ≤3 unique candidates (more = likely a big list)
-    if len(unique) > 3:
+    return unique
+
+
+def fetch_posters(text):
+    """Verify candidates via TMDB, return {title: url} only when ≤3 real movies found."""
+    if not TMDB_API_KEY:
+        return {}
+    candidates = _extract_candidates(text)
+    if not candidates or len(candidates) > 3:
         return {}
     with ThreadPoolExecutor(max_workers=3) as ex:
-        futures = {ex.submit(_tmdb_verified, t): t for t in unique}
+        futures = {ex.submit(_tmdb_verified, t): t for t in candidates}
         return {futures[f]: url for f in as_completed(futures)
                 if (url := f.result()) is not None}
+
+
+def _title_in_para(title, para):
+    """True if title appears as bold or heading in this paragraph."""
+    return (
+        f"**{title}**" in para or
+        bool(re.search(rf'#{1,3}.*{re.escape(title)}', para))
+    )
 
 
 def render_reply(text, posters):
@@ -129,8 +140,8 @@ def render_reply(text, posters):
     for para in paragraphs:
         st.markdown(para)
         for title, url in posters.items():
-            if title not in used and f"**{title}**" in para:
-                col1, col2, col3 = st.columns([2, 1, 2])
+            if title not in used and _title_in_para(title, para):
+                _, col2, _ = st.columns([2, 1, 2])
                 with col2:
                     st.image(url, use_container_width=True)
                     st.caption(title)
