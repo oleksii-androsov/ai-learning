@@ -157,10 +157,10 @@ Never state or imply a film's release status from memory — always verify via T
 
 Always include streaming platform names in recommendations. Mirror the user's communication style.
 
-When your response focuses on 1-3 specific films in depth (detailed info, fact-check, showtime query), append this line at the very end of your response:
+When your response mentions up to 5 specific film titles, append this line at the very end of your response — but only for titles that are featured prominently enough to warrant a poster (a dedicated section, a detailed breakdown, or a clear recommendation). Use your judgement: a title mentioned briefly in passing does not need a poster.
 POSTERS: Exact Title As In Response
-For multiple titles: POSTERS: Title One, Title Two
-Omit this line entirely for general recommendation lists or when no specific film is the focus."""
+For multiple titles: POSTERS: Title One, Title Two, Title Three
+Omit this line only when no specific film is named or no title is prominent enough."""
 
 
 def _run_specialist(system_prompt, tools, request, model="claude-sonnet-4-6"):
