@@ -56,7 +56,7 @@ EXAMPLE_PROMPTS = [
 
 TMDB_API_KEY = os.getenv("TMDB_API_KEY")
 TMDB_SEARCH  = "https://api.themoviedb.org/3/search/movie"
-TMDB_IMG     = "https://image.tmdb.org/t/p/w342"
+TMDB_IMG     = "https://image.tmdb.org/t/p/w780"
 
 
 def fetch_posters(titles):
