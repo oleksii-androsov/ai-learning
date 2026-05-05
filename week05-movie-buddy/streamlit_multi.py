@@ -9,7 +9,11 @@ st.set_page_config(page_title="Movie Buddy", page_icon="🎬", layout="centered"
 
 st.markdown("""
 <style>
-    .movie-buddy-header { text-align: center; padding: 1.5rem 0 0.75rem 0; }
+    .movie-buddy-header {
+        text-align: center; padding: 1.75rem 2rem 1.25rem 2rem;
+        background: linear-gradient(135deg, #1a1f2e 0%, #16213e 100%);
+        border-radius: 14px; margin-bottom: 1rem;
+    }
     .movie-buddy-title  { font-size: 2.8rem; font-weight: 700; margin: 0; }
     .movie-buddy-sub    { color: #888; font-size: 0.9rem; margin-top: 0.25rem; letter-spacing: 0.05em; }
     .specialist-badge {
