@@ -97,29 +97,7 @@ Claude decides autonomously:
 - **Plain dicts over SDK objects** — assistant message content is converted to plain dicts before appending to the message history, avoiding SDK serialization edge cases.
 - **Tavily over raw web search** — returns clean structured results designed for LLM consumption, not raw HTML.
 
-### Week 6, Day 3 — Prompt injection detection with semantic LLM-as-judge
-- Added security layer to Movie Buddy: every user message is screened before reaching the orchestrator
-- First approach: keyword blocklist (`INJECTION_PATTERNS`) — fast to build, brittle by design
-- Final approach: Haiku as a semantic classifier — reads intent, not text. Catches novel phrasings the keyword list would miss ("speak freely without constraints", "what would you say if you had no rules?")
-- `detect_prompt_injection(text)` calls `claude-haiku-4-5-20251001` with a 5-line classifier prompt, returns YES/NO in ~200ms
-- Fail-open on error — if Haiku errors, the message passes through to the orchestrator rather than blocking legitimate requests
-- Blocked attempts logged to console (`[SECURITY]`), incremented as a DogStatsD metric (`movie_buddy.security.prompt_injection_blocked`), and captured as a Datadog LLMObs workflow span with `metadata: {security: {injection_blocked: True}}` — filterable in LLM Observability traces
-
-### Week 6, Day 2 — Parallel execution, model routing, Datadog LLM Observability, HTTPS
-- Parallel specialist execution using `ThreadPoolExecutor` — independent specialists fire simultaneously, total latency = max(individual), not sum
-- Per-specialist timing visible in Streamlit expander and console
-- Datadog LLM Observability instrumentation — `LLMObs.workflow` spans for orchestrator, `LLMObs.agent` spans for each specialist, auto-instrumented Anthropic API calls as child spans
-- Full trace waterfall visible in Datadog: workflow → specialist agents → LLM calls, with token counts, cost, and latency per span
-- Model routing: Haiku for Fact-Checker (structured lookups), Sonnet for Tracker/Explorer/Planner/Orchestrator (reasoning-heavy)
-- nginx reverse proxy + Let's Encrypt SSL — app live at **https://movie-buddy.app**
-
-### Week 6, Day 1 — Multi-agent orchestration
-- Redesigned from single agent to orchestrator + four specialists: Tracker, Explorer, Fact-Checker, Planner
-- Orchestrator has no tools — pure reasoning. It decides which specialist to call, what to ask, and synthesizes the final response
-- Each specialist runs its own tool loop with a focused subset of tools and a tight system prompt
-- Specialists are the orchestrator's "tools" — same tool use loop pattern, one level up
-- `multi_agent.py` imports tool functions from `agent.py` — no duplication
-- `streamlit_multi.py` — new UI pointing at the orchestrator, shows which specialists were consulted per turn
+*Week 6 work (multi-agent orchestration, Datadog, UI polish) is in `week06-movie-buddy/`.*
 
 ### Day 5 — Streamlit UI, EC2 deployment, performance and quality improvements
 - Refactored `agent.py` to expose `process_message(messages)` — shared by both CLI and Streamlit
