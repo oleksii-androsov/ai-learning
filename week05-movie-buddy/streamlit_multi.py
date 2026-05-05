@@ -1,9 +1,15 @@
 import sys
 import os
+import re
+import requests
+from concurrent.futures import ThreadPoolExecutor, as_completed
 sys.path.insert(0, os.path.dirname(__file__))
 
 import streamlit as st
+from dotenv import load_dotenv
 from multi_agent import process_message
+
+load_dotenv()
 
 st.set_page_config(page_title="Movie Buddy", page_icon="🎬", layout="centered")
 
@@ -48,6 +54,89 @@ EXAMPLE_PROMPTS = [
     "What's new on Netflix Germany this week?",
 ]
 
+TMDB_API_KEY = os.getenv("TMDB_API_KEY")
+TMDB_SEARCH  = "https://api.themoviedb.org/3/search/movie"
+TMDB_IMG     = "https://image.tmdb.org/t/p/w185"
+
+NON_TITLE_WORDS = {
+    "netflix", "prime", "amazon", "disney+", "apple tv+", "hbo", "max",
+    "note", "warning", "tip", "streaming", "theaters", "cinemas",
+    "germany", "uk", "usa", "frankfurt", "berlin", "munich",
+}
+
+
+def _looks_like_title(text):
+    words = text.split()
+    return 1 <= len(words) <= 6 and text.lower() not in NON_TITLE_WORDS
+
+
+def _tmdb_verified(query):
+    """Return poster URL if TMDB confidently matches query, else None."""
+    try:
+        r = requests.get(
+            TMDB_SEARCH,
+            params={"api_key": TMDB_API_KEY, "query": query, "language": "en-US"},
+            timeout=5,
+        )
+        results = r.json().get("results", []) if r.ok else []
+        if not results:
+            return None
+        top = results[0]
+        result_title = top.get("title", "").lower()
+        query_lower  = query.lower()
+        # Accept only if title closely matches and film has real audience data
+        title_match = (
+            result_title == query_lower or
+            query_lower in result_title or
+            result_title in query_lower
+        )
+        if title_match and top.get("vote_count", 0) > 50 and top.get("poster_path"):
+            return TMDB_IMG + top["poster_path"]
+    except Exception:
+        pass
+    return None
+
+
+def fetch_posters(text):
+    """Extract bold candidates, verify via TMDB, return {title: url} for ≤3 real movies."""
+    if not TMDB_API_KEY:
+        return {}
+    candidates = [c for c in re.findall(r'\*\*([^*]{2,50})\*\*', text) if _looks_like_title(c)]
+    if not candidates:
+        return {}
+    # Deduplicate preserving order
+    seen, unique = set(), []
+    for c in candidates:
+        if c not in seen:
+            seen.add(c)
+            unique.append(c)
+    # Only attempt verification if ≤3 unique candidates (more = likely a big list)
+    if len(unique) > 3:
+        return {}
+    with ThreadPoolExecutor(max_workers=3) as ex:
+        futures = {ex.submit(_tmdb_verified, t): t for t in unique}
+        return {futures[f]: url for f in as_completed(futures)
+                if (url := f.result()) is not None}
+
+
+def render_reply(text, posters):
+    """Render reply as markdown, inserting each poster after the paragraph that names it."""
+    if not posters:
+        st.markdown(text)
+        return
+    paragraphs = text.split("\n\n")
+    used = set()
+    for para in paragraphs:
+        st.markdown(para)
+        for title, url in posters.items():
+            if title not in used and f"**{title}**" in para:
+                col1, col2, col3 = st.columns([2, 1, 2])
+                with col2:
+                    st.image(url, use_container_width=True)
+                    st.caption(title)
+                used.add(title)
+
+
 if "messages"        not in st.session_state: st.session_state.messages        = []
 if "display_history" not in st.session_state: st.session_state.display_history = []
 if "pending_prompt"  not in st.session_state: st.session_state.pending_prompt  = None
@@ -80,7 +169,10 @@ if not st.session_state.display_history and not st.session_state.pending_prompt:
 # Render conversation history
 for i, entry in enumerate(st.session_state.display_history):
     with st.chat_message(entry["role"]):
-        st.markdown(entry["content"])
+        if entry["role"] == "assistant" and entry.get("calls"):
+            render_reply(entry["content"], entry.get("posters", {}))
+        else:
+            st.markdown(entry["content"])
     if entry.get("calls"):
         render_expander(entry["calls"], entry.get("total_elapsed"), key=f"expander_{i}")
 
@@ -100,7 +192,8 @@ if prompt:
     with st.chat_message("assistant"):
         with st.spinner("Consulting the team..."):
             reply, calls, total_elapsed = process_message(st.session_state.messages)
-        st.markdown(reply)
+        posters = fetch_posters(reply) if calls else {}
+        render_reply(reply, posters)
         if calls:
             render_expander(calls, total_elapsed, key=f"expander_{len(st.session_state.display_history)}")
 
@@ -109,4 +202,5 @@ if prompt:
         "content":       reply,
         "calls":         calls,
         "total_elapsed": total_elapsed,
+        "posters":       posters,
     })
