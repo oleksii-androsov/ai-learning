@@ -155,7 +155,12 @@ Ask clarifying questions before consulting specialists when you're missing key i
 
 Never state or imply a film's release status from memory — always verify via Tracker or Fact-Checker. A film you think is "coming soon" may already be in cinemas.
 
-Always include streaming platform names in recommendations. Mirror the user's communication style."""
+Always include streaming platform names in recommendations. Mirror the user's communication style.
+
+When your response focuses on 1-3 specific films in depth (detailed info, fact-check, showtime query), append this line at the very end of your response:
+POSTERS: Exact Title As In Response
+For multiple titles: POSTERS: Title One, Title Two
+Omit this line entirely for general recommendation lists or when no specific film is the focus."""
 
 
 def _run_specialist(system_prompt, tools, request, model="claude-sonnet-4-6"):
@@ -229,9 +234,20 @@ def _call_specialist(name, request):
     return result, elapsed
 
 
+def _parse_posters(reply):
+    """Extract POSTERS: line from reply. Returns (clean_reply, [title, ...])."""
+    import re
+    match = re.search(r'\n?POSTERS:\s*(.+)$', reply, re.MULTILINE)
+    if not match:
+        return reply, []
+    titles = [t.strip() for t in match.group(1).split(',') if t.strip()]
+    clean = reply[:match.start()].rstrip()
+    return clean, titles
+
+
 def process_message(messages):
     """Run one orchestrator turn. Appends to messages in place.
-    Returns (reply, specialist_calls_log, total_specialist_elapsed_s)."""
+    Returns (reply, specialist_calls_log, total_specialist_elapsed_s, poster_titles)."""
     calls_log = []
     total_elapsed = None
     user_msg = next(
@@ -251,7 +267,7 @@ def process_message(messages):
                     output_data=[{"role": "assistant", "content": reply}],
                     metadata={"security": {"injection_blocked": True}},
                 )
-            return reply, calls_log, total_elapsed
+            return reply, calls_log, total_elapsed, []
 
         if LLMOBS_ENABLED:
             LLMObs.annotate(workflow_span, input_data=[{"role": "user", "content": user_msg}])
@@ -314,8 +330,9 @@ def process_message(messages):
 
             else:
                 reply = next(b.text for b in response.content if hasattr(b, "text"))
+                reply, poster_titles = _parse_posters(reply)
                 if LLMOBS_ENABLED and workflow_span is not None:
                     LLMObs.annotate(workflow_span, output_data=[{"role": "assistant", "content": reply}])
                 break
 
-    return reply, calls_log, total_elapsed
+    return reply, calls_log, total_elapsed, poster_titles

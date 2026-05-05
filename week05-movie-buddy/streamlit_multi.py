@@ -56,81 +56,37 @@ EXAMPLE_PROMPTS = [
 
 TMDB_API_KEY = os.getenv("TMDB_API_KEY")
 TMDB_SEARCH  = "https://api.themoviedb.org/3/search/movie"
-TMDB_IMG     = "https://image.tmdb.org/t/p/w185"
-
-NON_TITLE_HEADINGS = {
-    "where to watch", "cast", "plot", "overview", "synopsis", "streaming",
-    "showtimes", "schedule", "details", "ratings", "why you should watch",
-    "currently in theaters", "on streaming", "verdict",
-}
+TMDB_IMG     = "https://image.tmdb.org/t/p/w342"
 
 
-def _looks_like_title(text):
-    words = text.split()
-    return 1 <= len(words) <= 6 and text.lower() not in NON_TITLE_HEADINGS
-
-
-def _tmdb_verified(query):
-    """Return poster URL if TMDB confidently matches query, else None."""
-    try:
-        r = requests.get(
-            TMDB_SEARCH,
-            params={"api_key": TMDB_API_KEY, "query": query, "language": "en-US"},
-            timeout=5,
-        )
-        results = r.json().get("results", []) if r.ok else []
-        if not results:
-            return None
-        top = results[0]
-        result_title = top.get("title", "").lower()
-        query_lower  = re.sub(r'\s*\(\d{4}\)\s*$', '', query).lower().strip()
-        title_match = (
-            result_title == query_lower or
-            query_lower in result_title or
-            result_title in query_lower
-        )
-        if title_match and top.get("vote_count", 0) > 50 and top.get("poster_path"):
-            return TMDB_IMG + top["poster_path"]
-    except Exception:
-        pass
-    return None
-
-
-def _extract_candidates(text):
-    """Extract title candidates from markdown headings only — bold text is too noisy."""
-    headings = re.findall(r'^#{1,3}\s+[\W_]*([A-Z][^\n]{1,50})', text, re.MULTILINE)
-    seen, unique = set(), []
-    for h in headings:
-        h = h.strip()
-        if h not in seen and _looks_like_title(h):
-            seen.add(h)
-            unique.append(h)
-    return unique
-
-
-def fetch_posters(text):
-    """Verify candidates via TMDB, return {title: url} only when ≤3 real movies found."""
-    if not TMDB_API_KEY:
+def fetch_posters(titles):
+    """Fetch TMDB poster URLs for a list of titles provided by the Orchestrator."""
+    if not TMDB_API_KEY or not titles:
         return {}
-    candidates = _extract_candidates(text)
-    if not candidates or len(candidates) > 3:
-        return {}
+
+    def _fetch(title):
+        query = re.sub(r'\s*\(\d{4}\)\s*$', '', title).strip()
+        try:
+            r = requests.get(
+                TMDB_SEARCH,
+                params={"api_key": TMDB_API_KEY, "query": query, "language": "en-US"},
+                timeout=5,
+            )
+            results = r.json().get("results", []) if r.ok else []
+            if results and results[0].get("poster_path"):
+                return title, TMDB_IMG + results[0]["poster_path"]
+        except Exception:
+            pass
+        return title, None
+
     with ThreadPoolExecutor(max_workers=3) as ex:
-        futures = {ex.submit(_tmdb_verified, t): t for t in candidates}
-        return {futures[f]: url for f in as_completed(futures)
-                if (url := f.result()) is not None}
-
-
-def _title_in_para(title, para):
-    """True if title appears as bold or heading in this paragraph."""
-    return (
-        f"**{title}**" in para or
-        bool(re.search(rf'#{1,3}.*{re.escape(title)}', para))
-    )
+        futures = [ex.submit(_fetch, t) for t in titles]
+        return {t: url for f in as_completed(futures)
+                for t, url in [f.result()] if url}
 
 
 def render_reply(text, posters):
-    """Render reply as markdown, inserting each poster after the paragraph that names it."""
+    """Render reply with posters inserted after the paragraph that first names each title."""
     if not posters:
         st.markdown(text)
         return
@@ -139,7 +95,7 @@ def render_reply(text, posters):
     for para in paragraphs:
         st.markdown(para)
         for title, url in posters.items():
-            if title not in used and _title_in_para(title, para):
+            if title not in used and title in para:
                 _, col2, _ = st.columns([2, 1, 2])
                 with col2:
                     st.image(url, use_container_width=True)
@@ -201,11 +157,11 @@ if prompt:
 
     with st.chat_message("assistant"):
         with st.spinner("Consulting the team..."):
-            reply, calls, total_elapsed = process_message(st.session_state.messages)
-        posters = fetch_posters(reply) if calls else {}
+            reply, calls, total_elapsed, poster_titles = process_message(st.session_state.messages)
+        posters = fetch_posters(poster_titles) if poster_titles else {}
         render_reply(reply, posters)
         if calls:
-            render_expander(calls, total_elapsed, key=f"expander_{len(st.session_state.display_history)}")
+            render_expander(calls, total_elapsed, key=f"live_expander_{len(st.session_state.display_history)}")
 
     st.session_state.display_history.append({
         "role":          "assistant",
