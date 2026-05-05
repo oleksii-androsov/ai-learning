@@ -73,8 +73,15 @@ def fetch_posters(titles):
                 timeout=5,
             )
             results = r.json().get("results", []) if r.ok else []
-            if results and results[0].get("poster_path"):
-                return title, TMDB_IMG + results[0]["poster_path"]
+            if results:
+                top = results[0]
+                result_title = top.get("title", "").lower()
+                query_lower  = query.lower()
+                # query must equal or be a substring of the result title — not the reverse,
+                # which would let "Zootopia" match a search for "Zootopia 2"
+                if (result_title == query_lower or query_lower in result_title):
+                    if top.get("poster_path"):
+                        return title, TMDB_IMG + top["poster_path"]
         except Exception:
             pass
         return title, None
