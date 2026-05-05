@@ -87,6 +87,7 @@ def fetch_posters(titles):
 
 def render_reply(text, posters):
     """Render reply with posters inserted after the paragraph that first names each title."""
+    text = re.sub(r'\n\s*---\s*\n', '\n\n', text)
     if not posters:
         st.markdown(text)
         return
@@ -96,10 +97,8 @@ def render_reply(text, posters):
         st.markdown(para)
         for title, url in posters.items():
             if title not in used and title in para:
-                _, col2, _ = st.columns([2, 1, 2])
-                with col2:
-                    st.image(url, use_container_width=True)
-                    st.caption(title)
+                st.image(url, use_container_width=True)
+                st.caption(title)
                 used.add(title)
 
 
