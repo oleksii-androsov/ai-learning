@@ -58,16 +58,16 @@ TMDB_API_KEY = os.getenv("TMDB_API_KEY")
 TMDB_SEARCH  = "https://api.themoviedb.org/3/search/movie"
 TMDB_IMG     = "https://image.tmdb.org/t/p/w185"
 
-NON_TITLE_WORDS = {
-    "netflix", "prime", "amazon", "disney+", "apple tv+", "hbo", "max",
-    "note", "warning", "tip", "streaming", "theaters", "cinemas",
-    "germany", "uk", "usa", "frankfurt", "berlin", "munich",
+NON_TITLE_HEADINGS = {
+    "where to watch", "cast", "plot", "overview", "synopsis", "streaming",
+    "showtimes", "schedule", "details", "ratings", "why you should watch",
+    "currently in theaters", "on streaming", "verdict",
 }
 
 
 def _looks_like_title(text):
     words = text.split()
-    return 1 <= len(words) <= 6 and text.lower() not in NON_TITLE_WORDS
+    return 1 <= len(words) <= 6 and text.lower() not in NON_TITLE_HEADINGS
 
 
 def _tmdb_verified(query):
@@ -97,15 +97,14 @@ def _tmdb_verified(query):
 
 
 def _extract_candidates(text):
-    """Extract title candidates from bold text and markdown headings."""
-    bold     = re.findall(r'\*\*([^*]{2,50})\*\*', text)
+    """Extract title candidates from markdown headings only — bold text is too noisy."""
     headings = re.findall(r'^#{1,3}\s+[\W_]*([A-Z][^\n]{1,50})', text, re.MULTILINE)
     seen, unique = set(), []
-    for c in bold + headings:
-        c = c.strip()
-        if c not in seen and _looks_like_title(c):
-            seen.add(c)
-            unique.append(c)
+    for h in headings:
+        h = h.strip()
+        if h not in seen and _looks_like_title(h):
+            seen.add(h)
+            unique.append(h)
     return unique
 
 
@@ -185,7 +184,7 @@ for i, entry in enumerate(st.session_state.display_history):
         else:
             st.markdown(entry["content"])
     if entry.get("calls"):
-        render_expander(entry["calls"], entry.get("total_elapsed"), key=f"expander_{i}")
+        render_expander(entry["calls"], entry.get("total_elapsed"), key=f"hist_expander_{i}")
 
 # Chat input — example button clicks feed through pending_prompt
 prompt = st.chat_input("Ask about movies...")
