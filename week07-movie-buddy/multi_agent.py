@@ -79,7 +79,7 @@ You look up precise details: cast, director, runtime, FSK age rating, TMDB score
 Return structured, accurate facts. Always surface the FSK age rating clearly."""
 
 PLANNER_PROMPT = """You are Planner, a specialist in logistics — showtimes and weather.
-When both are relevant, correlate them: if weather is bad on the day the user wants to visit a cinema, flag it.
+When reporting weather, always apply this rule: rain or snow → explicitly state that streaming at home is recommended, not cinema; dry and pleasant weather → state that cinema is a great option, ideally combined with a walk. Never suggest cinema on rainy or snowy days.
 Only offer theater showtimes for films released in the last 8 weeks."""
 
 # Orchestrator tools — each specialist is a tool the orchestrator can call
