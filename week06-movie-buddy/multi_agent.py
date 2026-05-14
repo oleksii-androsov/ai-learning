@@ -223,9 +223,15 @@ def _call_specialist(name, request):
 
     if LLMOBS_ENABLED:
         with LLMObs.agent(name=label) as span:
-            LLMObs.annotate(span, input_data=[{"role": "user", "content": request}])
+            try:
+                LLMObs.annotate(span, input_data=[{"role": "user", "content": request}])
+            except Exception:
+                pass
             result = _run()
-            LLMObs.annotate(span, output_data=[{"role": "assistant", "content": result}])
+            try:
+                LLMObs.annotate(span, output_data=[{"role": "assistant", "content": result}])
+            except Exception:
+                pass
     else:
         result = _run()
 
@@ -261,16 +267,22 @@ def process_message(messages):
         if detect_prompt_injection(user_msg):
             reply = handle_injection(user_msg)
             if LLMOBS_ENABLED and workflow_span is not None:
-                LLMObs.annotate(
-                    workflow_span,
-                    input_data=[{"role": "user", "content": user_msg}],
-                    output_data=[{"role": "assistant", "content": reply}],
-                    metadata={"security": {"injection_blocked": True}},
-                )
+                try:
+                    LLMObs.annotate(
+                        workflow_span,
+                        input_data=[{"role": "user", "content": user_msg}],
+                        output_data=[{"role": "assistant", "content": reply}],
+                        metadata={"security": {"injection_blocked": True}},
+                    )
+                except Exception:
+                    pass
             return reply, calls_log, total_elapsed, []
 
         if LLMOBS_ENABLED:
-            LLMObs.annotate(workflow_span, input_data=[{"role": "user", "content": user_msg}])
+            try:
+                LLMObs.annotate(workflow_span, input_data=[{"role": "user", "content": user_msg}])
+            except Exception:
+                pass
 
         reply = None
         while True:
@@ -332,7 +344,10 @@ def process_message(messages):
                 reply = next(b.text for b in response.content if hasattr(b, "text"))
                 reply, poster_titles = _parse_posters(reply)
                 if LLMOBS_ENABLED and workflow_span is not None:
-                    LLMObs.annotate(workflow_span, output_data=[{"role": "assistant", "content": reply}])
+                    try:
+                        LLMObs.annotate(workflow_span, output_data=[{"role": "assistant", "content": reply}])
+                    except Exception:
+                        pass
                 break
 
     return reply, calls_log, total_elapsed, poster_titles
