@@ -1,6 +1,7 @@
 import sys
 import os
 import time
+import datetime
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from contextlib import nullcontext
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'week05-movie-buddy'))
@@ -288,10 +289,13 @@ def process_message(messages):
 
         reply = None
         while True:
+            today = datetime.date.today()
+            day_name = today.strftime("%A")
+            system = ORCHESTRATOR_PROMPT + f"\n\nToday is {day_name}, {today.isoformat()}. Use this to interpret relative terms like 'this weekend', 'next week', 'tomorrow'."
             response = client.messages.create(
                 model="claude-sonnet-4-6",
                 max_tokens=2048,
-                system=ORCHESTRATOR_PROMPT,
+                system=system,
                 tools=orchestrator_tools,
                 messages=messages,
             )
