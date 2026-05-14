@@ -1,0 +1,178 @@
+import sys
+import os
+import re
+import requests
+from concurrent.futures import ThreadPoolExecutor, as_completed
+sys.path.insert(0, os.path.dirname(__file__))
+
+import streamlit as st
+from dotenv import load_dotenv
+from multi_agent import process_message
+
+load_dotenv()
+
+st.set_page_config(page_title="Movie Buddy", page_icon="🎬", layout="centered")
+
+st.markdown("""
+<style>
+    .movie-buddy-header {
+        text-align: center; padding: 1.75rem 2rem 1.25rem 2rem;
+        background: linear-gradient(135deg, #1a1f2e 0%, #16213e 100%);
+        border-radius: 14px; margin-bottom: 1rem;
+    }
+    .movie-buddy-title  { font-size: 2.8rem; font-weight: 700; margin: 0; }
+    .movie-buddy-sub    { color: #888; font-size: 0.9rem; margin-top: 0.25rem; letter-spacing: 0.05em; }
+    .specialist-badge {
+        display: inline-block; padding: 2px 10px; border-radius: 12px;
+        font-size: 0.78rem; font-weight: 600; color: white; margin-right: 6px;
+    }
+    div[data-testid="stButton"] > button {
+        text-align: left; height: auto; white-space: normal;
+        padding: 0.65rem 1rem; border-radius: 10px; width: 100%;
+    }
+</style>
+""", unsafe_allow_html=True)
+
+st.markdown("""
+<div class="movie-buddy-header">
+    <div class="movie-buddy-title">🎬 Movie Buddy</div>
+    <div class="movie-buddy-sub">Tracker &nbsp;·&nbsp; Explorer &nbsp;·&nbsp; Fact-Checker &nbsp;·&nbsp; Planner</div>
+</div>
+""", unsafe_allow_html=True)
+
+SPECIALIST_COLORS = {
+    "Tracker":      "#1f77b4",
+    "Explorer":     "#2ca02c",
+    "Fact-Checker": "#ff7f0e",
+    "Planner":      "#9467bd",
+}
+
+EXAMPLE_PROMPTS = [
+    "What's a good film for a family with kids aged 8 and 12?",
+    "What's currently showing in Frankfurt cinemas?",
+    "I loved Interstellar — what should I watch next?",
+    "What's new on Netflix Germany this week?",
+]
+
+TMDB_API_KEY = os.getenv("TMDB_API_KEY")
+TMDB_SEARCH  = "https://api.themoviedb.org/3/search/movie"
+TMDB_IMG     = "https://image.tmdb.org/t/p/w780"
+
+
+def fetch_posters(titles):
+    """Fetch TMDB poster URLs for a list of titles provided by the Orchestrator."""
+    if not TMDB_API_KEY or not titles:
+        return {}
+
+    def _fetch(title):
+        query = re.sub(r'\s*\(\d{4}\)\s*$', '', title).strip()
+        try:
+            r = requests.get(
+                TMDB_SEARCH,
+                params={"api_key": TMDB_API_KEY, "query": query, "language": "en-US"},
+                timeout=5,
+            )
+            results = r.json().get("results", []) if r.ok else []
+            if results:
+                top = results[0]
+                result_title = top.get("title", "").lower()
+                query_lower  = query.lower()
+                # query must equal or be a substring of the result title — not the reverse,
+                # which would let "Zootopia" match a search for "Zootopia 2"
+                if (result_title == query_lower or query_lower in result_title):
+                    if top.get("poster_path"):
+                        return title, TMDB_IMG + top["poster_path"]
+        except Exception:
+            pass
+        return title, None
+
+    with ThreadPoolExecutor(max_workers=3) as ex:
+        futures = [ex.submit(_fetch, t) for t in titles]
+        return {t: url for f in as_completed(futures)
+                for t, url in [f.result()] if url}
+
+
+def render_reply(text, posters):
+    """Render reply with posters inserted after the paragraph that first names each title."""
+    text = re.sub(r'\n\s*---\s*\n', '\n\n', text)
+    if not posters:
+        st.markdown(text)
+        return
+    paragraphs = text.split("\n\n")
+    used = set()
+    for para in paragraphs:
+        st.markdown(para)
+        for title, url in posters.items():
+            if title not in used and title in para:
+                st.image(url, use_container_width=True)
+                st.caption(title)
+                used.add(title)
+
+
+if "messages"        not in st.session_state: st.session_state.messages        = []
+if "display_history" not in st.session_state: st.session_state.display_history = []
+if "pending_prompt"  not in st.session_state: st.session_state.pending_prompt  = None
+
+
+def render_expander(calls, total_elapsed, key):
+    header = f"🤖 {len(calls)} specialist(s) consulted"
+    if total_elapsed is not None:
+        header += f" · {total_elapsed}s"
+    with st.expander(header, key=key):
+        for c in calls:
+            color = SPECIALIST_COLORS.get(c["specialist"], "#666")
+            badge = f'<span class="specialist-badge" style="background:{color}">{c["specialist"]}</span>'
+            st.markdown(
+                f'{badge}<span style="color:#888;font-size:0.82rem">{c.get("elapsed_s","?")}s</span>'
+                f' — {c["request"]}',
+                unsafe_allow_html=True,
+            )
+
+
+# Welcome screen — only when no conversation and nothing pending
+if not st.session_state.display_history and not st.session_state.pending_prompt:
+    st.markdown("#### What can I help you find?")
+    cols = st.columns(2)
+    for i, example in enumerate(EXAMPLE_PROMPTS):
+        if cols[i % 2].button(example, use_container_width=True):
+            st.session_state.pending_prompt = example
+            st.rerun()
+
+# Render conversation history
+for i, entry in enumerate(st.session_state.display_history):
+    with st.chat_message(entry["role"]):
+        if entry["role"] == "assistant":
+            render_reply(entry["content"], entry.get("posters", {}))
+        else:
+            st.markdown(entry["content"])
+    if entry.get("calls"):
+        render_expander(entry["calls"], entry.get("total_elapsed"), key=f"hist_expander_{i}")
+
+# Chat input — example button clicks feed through pending_prompt
+prompt = st.chat_input("Ask about movies...")
+if st.session_state.pending_prompt:
+    prompt = st.session_state.pending_prompt
+    st.session_state.pending_prompt = None
+
+if prompt:
+    st.session_state.messages.append({"role": "user", "content": prompt})
+    st.session_state.display_history.append({"role": "user", "content": prompt})
+
+    with st.chat_message("user"):
+        st.markdown(prompt)
+
+    with st.chat_message("assistant"):
+        with st.spinner("Consulting the team..."):
+            reply, calls, total_elapsed, poster_titles = process_message(st.session_state.messages)
+        posters = fetch_posters(poster_titles) if poster_titles else {}
+        render_reply(reply, posters)
+        if calls:
+            render_expander(calls, total_elapsed, key=f"live_expander_{len(st.session_state.display_history)}")
+
+    st.session_state.display_history.append({
+        "role":          "assistant",
+        "content":       reply,
+        "calls":         calls,
+        "total_elapsed": total_elapsed,
+        "posters":       posters,
+    })

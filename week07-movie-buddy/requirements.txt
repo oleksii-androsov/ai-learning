@@ -1,0 +1,5 @@
+anthropic
+python-dotenv
+requests
+tavily-python
+datadog
