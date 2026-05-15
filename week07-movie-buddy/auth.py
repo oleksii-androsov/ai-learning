@@ -16,7 +16,11 @@ def resolve_user(session_state, controller) -> Optional[str]:
     if "user_id" in session_state:
         return session_state["user_id"]
 
-    device_token = controller.get(COOKIE_NAME)
+    try:
+        device_token = controller.get(COOKIE_NAME)
+    except TypeError:
+        return None
+
     if device_token:
         user_id = get_user_id_for_device(device_token)
         if user_id:
