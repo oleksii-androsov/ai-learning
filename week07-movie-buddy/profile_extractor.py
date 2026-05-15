@@ -26,12 +26,12 @@ Return a JSON object with only the fields where you found new information. Omit 
 {
   "movies": [{"title": "...", "opinion": "liked|disliked|watched", "notes": "any specific comments"}],
   "genre_preferences": {"liked": ["..."], "disliked": ["..."]},
-  "children": [{"stated_age": N, "as_of": "YYYY-MM-DD"}],
+  "children": [{"stated_age": N}],
   "streaming_platforms": ["..."],
   "weather_preference": "cinema_when_rain|stream_when_rain"
 }
 
-For children: store the age exactly as stated and today's date as "as_of". Do not convert to birth year.
+For children: store the stated age only. Do not convert to birth year or add dates.
 For weather_preference: only set if the user explicitly stated a preference.
 If nothing new was learned, return an empty object: {}
 
@@ -125,7 +125,12 @@ def _merge(existing: dict, updates: dict) -> dict:
                     existing_list.append(g)
 
     if "children" in updates:
-        merged["children"] = updates["children"]
+        today = datetime.date.today().isoformat()
+        merged["children"] = [
+            {"stated_age": c["stated_age"], "as_of": today}
+            for c in updates["children"]
+            if "stated_age" in c
+        ]
 
     if "streaming_platforms" in updates:
         existing_platforms = [p.lower() for p in merged.get("streaming_platforms", [])]
