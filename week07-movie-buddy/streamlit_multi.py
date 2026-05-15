@@ -1,7 +1,11 @@
 import sys
 import os
 import re
+import logging
+import threading
 import requests
+
+logger = logging.getLogger(__name__)
 from concurrent.futures import ThreadPoolExecutor, as_completed
 sys.path.insert(0, os.path.dirname(__file__))
 
@@ -14,7 +18,7 @@ from memory import (
     get_summary, save_summary,
     format_profile_for_prompt, format_summary_for_prompt,
 )
-from profile_extractor import extract_profile_updates, update_summary
+from profile_extractor import extract_profile_updates, update_summary, should_extract
 
 load_dotenv()
 
@@ -112,6 +116,18 @@ def render_reply(text, posters):
                 used.add(title)
 
 
+def _auto_save_memory(user_id, messages, profile, prior_summary):
+    """Run in background thread — extract profile updates and save if anything changed."""
+    try:
+        updated_profile, changed = extract_profile_updates(messages, profile)
+        if changed:
+            save_profile(user_id, updated_profile)
+            new_summary = update_summary(user_id, messages, prior_summary)
+            save_summary(user_id, new_summary)
+    except Exception as e:
+        logger.warning(f"Auto-save memory failed: {e}")
+
+
 def render_expander(calls, total_elapsed, key):
     header = f"🤖 {len(calls)} specialist(s) consulted"
     if total_elapsed is not None:
@@ -136,7 +152,6 @@ for key, default in [
     ("profile_loaded", False),
     ("profile", {}),
     ("prior_summary", ""),
-    ("session_ended", False),
 ]:
     if key not in st.session_state:
         st.session_state[key] = default
@@ -170,32 +185,11 @@ if user_id and st.session_state.profile:
         parts.append(summary_text)
     user_context = "\n\n".join(parts)
 
-# ---------- Sidebar: session controls ----------
+# ---------- Sidebar ----------
 
 with st.sidebar:
     if user_id:
-        st.markdown(f"**Signed in** ✓")
-        st.markdown("---")
-    if st.session_state.messages and not st.session_state.session_ended:
-        if st.button("End session & save memory"):
-            with st.spinner("Saving your preferences..."):
-                updated_profile = extract_profile_updates(
-                    st.session_state.messages,
-                    st.session_state.profile,
-                )
-                if updated_profile != st.session_state.profile:
-                    save_profile(user_id, updated_profile)
-                    st.session_state.profile = updated_profile
-
-                new_summary = update_summary(
-                    user_id,
-                    st.session_state.messages,
-                    st.session_state.prior_summary,
-                )
-                save_summary(user_id, new_summary)
-                st.session_state.prior_summary = new_summary
-                st.session_state.session_ended = True
-            st.success("Memory saved!")
+        st.markdown("**Signed in** ✓")
 
 # ---------- Main chat UI ----------
 
@@ -247,3 +241,11 @@ if prompt:
         "total_elapsed": total_elapsed,
         "posters":       posters,
     })
+
+    # Auto-save memory in background if message looks profile-worthy
+    if user_id and should_extract(prompt):
+        threading.Thread(
+            target=_auto_save_memory,
+            args=(user_id, st.session_state.messages, st.session_state.profile, st.session_state.prior_summary),
+            daemon=True,
+        ).start()

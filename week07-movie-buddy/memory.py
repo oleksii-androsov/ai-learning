@@ -1,37 +1,67 @@
 import datetime
+import logging
 from typing import Optional
 import boto3
+from botocore.exceptions import BotoCoreError, ClientError
 
-dynamodb = boto3.resource("dynamodb", region_name="eu-central-1")
+logger = logging.getLogger(__name__)
 
-profiles_table   = dynamodb.Table("movie_buddy_profiles")
-summaries_table  = dynamodb.Table("movie_buddy_summaries")
-devices_table    = dynamodb.Table("movie_buddy_devices")
+try:
+    dynamodb = boto3.resource("dynamodb", region_name="eu-central-1")
+    profiles_table  = dynamodb.Table("movie_buddy_profiles")
+    summaries_table = dynamodb.Table("movie_buddy_summaries")
+    devices_table   = dynamodb.Table("movie_buddy_devices")
+    _DYNAMO_AVAILABLE = True
+except Exception:
+    _DYNAMO_AVAILABLE = False
+    logger.warning("DynamoDB unavailable — memory features disabled")
 
 
 # ---------- Device token → user_id mapping ----------
 
 def get_user_id_for_device(device_token: str) -> Optional[str]:
-    resp = devices_table.get_item(Key={"device_token": device_token})
-    item = resp.get("Item")
-    return item["user_id"] if item else None
+    if not _DYNAMO_AVAILABLE:
+        return None
+    try:
+        resp = devices_table.get_item(Key={"device_token": device_token})
+        item = resp.get("Item")
+        return item["user_id"] if item else None
+    except (BotoCoreError, ClientError) as e:
+        logger.warning(f"DynamoDB get_user_id_for_device failed: {e}")
+        return None
 
 
 def register_device(device_token: str, user_id: str):
-    devices_table.put_item(Item={"device_token": device_token, "user_id": user_id})
+    if not _DYNAMO_AVAILABLE:
+        return
+    try:
+        devices_table.put_item(Item={"device_token": device_token, "user_id": user_id})
+    except (BotoCoreError, ClientError) as e:
+        logger.warning(f"DynamoDB register_device failed: {e}")
 
 
 # ---------- User profile ----------
 
 def get_profile(user_id: str) -> dict:
-    resp = profiles_table.get_item(Key={"user_id": user_id})
-    return resp.get("Item", {})
+    if not _DYNAMO_AVAILABLE:
+        return {}
+    try:
+        resp = profiles_table.get_item(Key={"user_id": user_id})
+        return resp.get("Item", {})
+    except (BotoCoreError, ClientError) as e:
+        logger.warning(f"DynamoDB get_profile failed: {e}")
+        return {}
 
 
 def save_profile(user_id: str, profile: dict):
-    profile["user_id"] = user_id
-    profile["updated_at"] = datetime.date.today().isoformat()
-    profiles_table.put_item(Item=profile)
+    if not _DYNAMO_AVAILABLE:
+        return
+    try:
+        profile["user_id"] = user_id
+        profile["updated_at"] = datetime.date.today().isoformat()
+        profiles_table.put_item(Item=profile)
+    except (BotoCoreError, ClientError) as e:
+        logger.warning(f"DynamoDB save_profile failed: {e}")
 
 
 def empty_profile(user_id: str) -> dict:
@@ -49,17 +79,28 @@ def empty_profile(user_id: str) -> dict:
 # ---------- Conversation summaries ----------
 
 def get_summary(user_id: str) -> str:
-    resp = summaries_table.get_item(Key={"user_id": user_id})
-    item = resp.get("Item")
-    return item["summary"] if item else ""
+    if not _DYNAMO_AVAILABLE:
+        return ""
+    try:
+        resp = summaries_table.get_item(Key={"user_id": user_id})
+        item = resp.get("Item")
+        return item["summary"] if item else ""
+    except (BotoCoreError, ClientError) as e:
+        logger.warning(f"DynamoDB get_summary failed: {e}")
+        return ""
 
 
 def save_summary(user_id: str, summary: str):
-    summaries_table.put_item(Item={
-        "user_id": user_id,
-        "summary": summary,
-        "updated_at": datetime.date.today().isoformat(),
-    })
+    if not _DYNAMO_AVAILABLE:
+        return
+    try:
+        summaries_table.put_item(Item={
+            "user_id": user_id,
+            "summary": summary,
+            "updated_at": datetime.date.today().isoformat(),
+        })
+    except (BotoCoreError, ClientError) as e:
+        logger.warning(f"DynamoDB save_summary failed: {e}")
 
 
 # ---------- Profile formatting for Orchestrator prompt ----------

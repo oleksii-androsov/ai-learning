@@ -1,9 +1,21 @@
 """Uses Haiku to extract user facts from a conversation and update the profile."""
 import json
+import logging
 import datetime
 import anthropic
 
+logger = logging.getLogger(__name__)
 client = anthropic.Anthropic()
+
+# Keywords that suggest a message may contain profile-worthy information
+_EXTRACTION_TRIGGERS = [
+    "watch", "seen", "liked", "loved", "hated", "enjoyed", "didn't like", "don't like",
+    "genre", "comedy", "sci-fi", "fantasy", "horror", "thriller", "drama", "animation",
+    "kids", "children", "daughter", "son", "family", "years old",
+    "netflix", "prime", "disney", "hbo", "apple tv", "streaming", "subscribe",
+    "prefer", "preference", "weather", "cinema", "rain",
+    "pixar", "dreamworks", "ghibli", "illumination",
+]
 
 EXTRACTION_PROMPT = """You are a profile extraction assistant for Movie Buddy, a film recommendation app.
 
@@ -39,27 +51,41 @@ New conversation to summarise:
 Return only the updated combined summary — a single paragraph merging prior history with today's session."""
 
 
-def extract_profile_updates(conversation: list[dict], existing_profile: dict) -> dict:
-    """Returns a dict of fields to merge into the profile. Empty dict = nothing new."""
-    conv_text = "\n".join(
-        f"{m['role'].upper()}: {m['content']}"
-        for m in conversation
-        if isinstance(m.get("content"), str)
-    )
+def should_extract(user_message: str) -> bool:
+    """Quick heuristic — skip Haiku call for short/trivial messages."""
+    msg = user_message.lower()
+    if len(msg.split()) < 8:
+        return False
+    return any(trigger in msg for trigger in _EXTRACTION_TRIGGERS)
 
-    response = client.messages.create(
-        model="claude-haiku-4-5-20251001",
-        max_tokens=1024,
-        system=EXTRACTION_PROMPT,
-        messages=[{"role": "user", "content": conv_text}],
-    )
 
+def extract_profile_updates(conversation: list, existing_profile: dict) -> tuple:
+    """Returns (updated_profile, changed: bool). Fails silently on error."""
     try:
-        updates = json.loads(response.content[0].text.strip())
-    except (json.JSONDecodeError, IndexError):
-        return {}
+        conv_text = "\n".join(
+            f"{m['role'].upper()}: {m['content']}"
+            for m in conversation
+            if isinstance(m.get("content"), str)
+        )
 
-    return _merge(existing_profile, updates)
+        response = client.messages.create(
+            model="claude-haiku-4-5-20251001",
+            max_tokens=1024,
+            system=EXTRACTION_PROMPT,
+            messages=[{"role": "user", "content": conv_text}],
+        )
+
+        updates = json.loads(response.content[0].text.strip())
+    except Exception as e:
+        logger.warning(f"Profile extraction failed: {e}")
+        return existing_profile, False
+
+    if not updates:
+        return existing_profile, False
+
+    merged = _merge(existing_profile, updates)
+    changed = merged != existing_profile
+    return merged, changed
 
 
 def _merge(existing: dict, updates: dict) -> dict:
@@ -69,7 +95,6 @@ def _merge(existing: dict, updates: dict) -> dict:
 
     merged = dict(existing)
 
-    # Movies — add new ones, skip duplicates by title
     if "movies" in updates:
         existing_titles = {m["title"].lower() for m in merged.get("movies", [])}
         for m in updates["movies"]:
@@ -77,7 +102,6 @@ def _merge(existing: dict, updates: dict) -> dict:
                 merged.setdefault("movies", []).append(m)
                 existing_titles.add(m["title"].lower())
 
-    # Genre preferences — union, no duplicates
     if "genre_preferences" in updates:
         for key in ("liked", "disliked"):
             new = updates["genre_preferences"].get(key, [])
@@ -86,41 +110,42 @@ def _merge(existing: dict, updates: dict) -> dict:
                 if g.lower() not in [e.lower() for e in existing_list]:
                     existing_list.append(g)
 
-    # Children — replace entirely if new info provided
     if "children" in updates:
         merged["children"] = updates["children"]
 
-    # Streaming platforms — union
     if "streaming_platforms" in updates:
         existing_platforms = [p.lower() for p in merged.get("streaming_platforms", [])]
         for p in updates["streaming_platforms"]:
             if p.lower() not in existing_platforms:
                 merged.setdefault("streaming_platforms", []).append(p)
 
-    # Weather preference — overwrite if explicitly stated
     if "weather_preference" in updates:
         merged["weather_preference"] = updates["weather_preference"]
 
     return merged
 
 
-def update_summary(user_id: str, conversation: list[dict], prior_summary: str) -> str:
-    """Returns updated combined summary string."""
-    conv_text = "\n".join(
-        f"{m['role'].upper()}: {m['content']}"
-        for m in conversation
-        if isinstance(m.get("content"), str)
-    )
+def update_summary(user_id: str, conversation: list, prior_summary: str) -> str:
+    """Returns updated combined summary string. Fails silently on error."""
+    try:
+        conv_text = "\n".join(
+            f"{m['role'].upper()}: {m['content']}"
+            for m in conversation
+            if isinstance(m.get("content"), str)
+        )
 
-    prompt = SUMMARY_PROMPT.format(
-        prior_summary=prior_summary or "(none)",
-        conversation=conv_text,
-    )
+        prompt = SUMMARY_PROMPT.format(
+            prior_summary=prior_summary or "(none)",
+            conversation=conv_text,
+        )
 
-    response = client.messages.create(
-        model="claude-haiku-4-5-20251001",
-        max_tokens=512,
-        messages=[{"role": "user", "content": prompt}],
-    )
+        response = client.messages.create(
+            model="claude-haiku-4-5-20251001",
+            max_tokens=512,
+            messages=[{"role": "user", "content": prompt}],
+        )
 
-    return response.content[0].text.strip()
+        return response.content[0].text.strip()
+    except Exception as e:
+        logger.warning(f"Summary update failed: {e}")
+        return prior_summary
