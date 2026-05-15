@@ -4,4 +4,3 @@ requests
 tavily-python
 datadog
 boto3
-streamlit-cookies-controller
