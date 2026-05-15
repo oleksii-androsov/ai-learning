@@ -2,7 +2,6 @@ import sys
 import os
 import re
 import logging
-import threading
 import requests
 
 logger = logging.getLogger(__name__)
@@ -116,17 +115,6 @@ def render_reply(text, posters):
                 used.add(title)
 
 
-def _auto_save_memory(user_id, messages, profile, prior_summary):
-    """Run in background thread — extract profile updates and save if anything changed."""
-    try:
-        updated_profile, changed = extract_profile_updates(messages, profile)
-        if changed:
-            save_profile(user_id, updated_profile)
-            new_summary = update_summary(user_id, messages, prior_summary)
-            save_summary(user_id, new_summary)
-    except Exception as e:
-        logger.warning(f"Auto-save memory failed: {e}")
-
 
 def render_expander(calls, total_elapsed, key):
     header = f"🤖 {len(calls)} specialist(s) consulted"
@@ -152,6 +140,7 @@ for key, default in [
     ("profile_loaded", False),
     ("profile", {}),
     ("prior_summary", ""),
+    ("memory_changes", []),
 ]:
     if key not in st.session_state:
         st.session_state[key] = default
@@ -185,11 +174,42 @@ if user_id and st.session_state.profile:
         parts.append(summary_text)
     user_context = "\n\n".join(parts)
 
-# ---------- Sidebar ----------
+# ---------- Sidebar: memory panel ----------
 
 with st.sidebar:
     if user_id:
         st.markdown("**Signed in** ✓")
+        st.markdown("---")
+
+        profile = st.session_state.profile
+        with st.expander("📋 Your profile", expanded=False):
+            if not any([
+                profile.get("movies"),
+                profile.get("genre_preferences", {}).get("liked"),
+                profile.get("children"),
+                profile.get("streaming_platforms"),
+                profile.get("weather_preference"),
+            ]):
+                st.markdown("_Nothing saved yet — tell me about your preferences!_")
+            else:
+                if profile.get("genre_preferences", {}).get("liked"):
+                    st.markdown(f"**Genres:** {', '.join(profile['genre_preferences']['liked'])}")
+                if profile.get("streaming_platforms"):
+                    st.markdown(f"**Platforms:** {', '.join(profile['streaming_platforms'])}")
+                if profile.get("children"):
+                    import datetime as _dt
+                    ages = [_dt.date.today().year - c["birth_year"] for c in profile["children"]]
+                    st.markdown(f"**Kids:** ages {', '.join(str(a) for a in ages)}")
+                if profile.get("weather_preference"):
+                    pref = "cinema even in rain" if profile["weather_preference"] == "cinema_when_rain" else "streaming when raining"
+                    st.markdown(f"**Weather:** {pref}")
+                if profile.get("movies"):
+                    st.markdown(f"**Movies watched:** {len(profile['movies'])}")
+
+        if st.session_state.memory_changes:
+            with st.expander(f"💾 Saved this session ({len(st.session_state.memory_changes)})", expanded=True):
+                for change in st.session_state.memory_changes:
+                    st.markdown(f"- {change}")
 
 # ---------- Main chat UI ----------
 
@@ -242,10 +262,34 @@ if prompt:
         "posters":       posters,
     })
 
-    # Auto-save memory in background if message looks profile-worthy
+    # Auto-save memory if message looks profile-worthy
     if user_id and should_extract(prompt):
-        threading.Thread(
-            target=_auto_save_memory,
-            args=(user_id, st.session_state.messages, st.session_state.profile, st.session_state.prior_summary),
-            daemon=True,
-        ).start()
+        try:
+            updated_profile, changed = extract_profile_updates(
+                st.session_state.messages,
+                st.session_state.profile,
+            )
+            if changed:
+                save_profile(user_id, updated_profile)
+                new_summary = update_summary(user_id, st.session_state.messages, st.session_state.prior_summary)
+                save_summary(user_id, new_summary)
+                # Track what changed for the sidebar
+                old = st.session_state.profile
+                if len(updated_profile.get("movies", [])) > len(old.get("movies", [])):
+                    new_movies = updated_profile["movies"][len(old.get("movies", [])):]
+                    for m in new_movies:
+                        st.session_state.memory_changes.append(f"Movie: {m['title']} ({m.get('opinion','watched')})")
+                if updated_profile.get("streaming_platforms") != old.get("streaming_platforms"):
+                    st.session_state.memory_changes.append(f"Platforms: {', '.join(updated_profile['streaming_platforms'])}")
+                if updated_profile.get("genre_preferences") != old.get("genre_preferences"):
+                    liked = updated_profile["genre_preferences"].get("liked", [])
+                    if liked:
+                        st.session_state.memory_changes.append(f"Genres: {', '.join(liked)}")
+                if updated_profile.get("children") != old.get("children"):
+                    st.session_state.memory_changes.append("Family info updated")
+                if updated_profile.get("weather_preference") != old.get("weather_preference"):
+                    st.session_state.memory_changes.append(f"Weather preference: {updated_profile['weather_preference']}")
+                st.session_state.profile = updated_profile
+                st.session_state.prior_summary = new_summary
+        except Exception as e:
+            logger.warning(f"Auto-save memory failed: {e}")
