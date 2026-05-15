@@ -68,6 +68,9 @@ def extract_profile_updates(conversation: list, existing_profile: dict) -> tuple
             if isinstance(m.get("content"), str)
         )
 
+        if not conv_text.strip():
+            return existing_profile, False
+
         response = client.messages.create(
             model="claude-haiku-4-5-20251001",
             max_tokens=1024,
@@ -75,7 +78,18 @@ def extract_profile_updates(conversation: list, existing_profile: dict) -> tuple
             messages=[{"role": "user", "content": conv_text}],
         )
 
-        updates = json.loads(response.content[0].text.strip())
+        raw = response.content[0].text.strip()
+        logger.info(f"Extractor raw response: {raw[:200]}")
+
+        # Strip markdown code block if present
+        import re as _re
+        match = _re.search(r'```(?:json)?\s*(\{.*?\})\s*```', raw, _re.DOTALL)
+        text = match.group(1) if match else raw
+
+        if not text:
+            return existing_profile, False
+
+        updates = json.loads(text)
     except Exception as e:
         logger.warning(f"Profile extraction failed: {e}")
         return existing_profile, False
