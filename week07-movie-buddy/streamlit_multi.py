@@ -156,7 +156,6 @@ if user_id and not st.session_state.profile_loaded:
     profile = get_profile(user_id)
     if not profile:
         profile = empty_profile(user_id)
-        save_profile(user_id, profile)
     st.session_state.profile = profile
     st.session_state.prior_summary = get_summary(user_id)
     st.session_state.profile_loaded = True
