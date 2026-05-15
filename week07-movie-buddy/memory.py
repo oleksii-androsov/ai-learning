@@ -36,7 +36,7 @@ def register_device(device_token: str, user_id: str):
         return
     try:
         devices_table.put_item(Item={"device_token": device_token, "user_id": user_id})
-    except (BotoCoreError, ClientError) as e:
+    except Exception as e:
         logger.warning(f"DynamoDB register_device failed: {e}")
 
 
@@ -59,8 +59,10 @@ def save_profile(user_id: str, profile: dict):
     try:
         profile["user_id"] = user_id
         profile["updated_at"] = datetime.date.today().isoformat()
-        profiles_table.put_item(Item=profile)
-    except (BotoCoreError, ClientError) as e:
+        # DynamoDB rejects None values — strip them before writing
+        clean = {k: v for k, v in profile.items() if v is not None}
+        profiles_table.put_item(Item=clean)
+    except Exception as e:
         logger.warning(f"DynamoDB save_profile failed: {e}")
 
 
@@ -99,7 +101,7 @@ def save_summary(user_id: str, summary: str):
             "summary": summary,
             "updated_at": datetime.date.today().isoformat(),
         })
-    except (BotoCoreError, ClientError) as e:
+    except Exception as e:
         logger.warning(f"DynamoDB save_summary failed: {e}")
 
 
