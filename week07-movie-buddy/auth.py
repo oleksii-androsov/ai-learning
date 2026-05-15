@@ -65,7 +65,11 @@ def show_auth_sidebar(session_state):
         ls_token = st.text_input(
             "ls_token",
             key="ls_token",
-            label_visibility="collapsed",
+            label_visibility="hidden",
+        )
+        st.markdown(
+            "<style>div[data-testid='stTextInput']:has(input[aria-label='ls_token']) {display:none}</style>",
+            unsafe_allow_html=True,
         )
         if ls_token and ls_token != session_state.get("_ls_device_token"):
             session_state["_ls_device_token"] = ls_token
