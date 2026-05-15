@@ -26,12 +26,12 @@ Return a JSON object with only the fields where you found new information. Omit 
 {
   "movies": [{"title": "...", "opinion": "liked|disliked|watched", "notes": "any specific comments"}],
   "genre_preferences": {"liked": ["..."], "disliked": ["..."]},
-  "children": [{"birth_year": YYYY}],
+  "children": [{"stated_age": N, "as_of": "YYYY-MM-DD"}],
   "streaming_platforms": ["..."],
   "weather_preference": "cinema_when_rain|stream_when_rain"
 }
 
-For children: if the user mentions ages, convert to birth year using today's year.
+For children: store the age exactly as stated and today's date as "as_of". Do not convert to birth year.
 For weather_preference: only set if the user explicitly stated a preference.
 If nothing new was learned, return an empty object: {}
 

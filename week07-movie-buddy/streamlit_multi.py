@@ -197,8 +197,16 @@ with st.sidebar:
                     st.markdown(f"**Platforms:** {', '.join(profile['streaming_platforms'])}")
                 if profile.get("children"):
                     import datetime as _dt
-                    ages = [_dt.date.today().year - c["birth_year"] for c in profile["children"]]
-                    st.markdown(f"**Kids:** ages {', '.join(str(a) for a in ages)}")
+                    today = _dt.date.today()
+                    ages = []
+                    for c in profile["children"]:
+                        if "stated_age" in c and "as_of" in c:
+                            as_of = _dt.date.fromisoformat(c["as_of"])
+                            ages.append(c["stated_age"] + (today.year - as_of.year))
+                        elif "birth_year" in c:
+                            ages.append(today.year - c["birth_year"])
+                    if ages:
+                        st.markdown(f"**Kids:** ages {', '.join(str(a) for a in ages)}")
                 if profile.get("weather_preference"):
                     pref = "cinema even in rain" if profile["weather_preference"] == "cinema_when_rain" else "streaming when raining"
                     st.markdown(f"**Weather:** {pref}")

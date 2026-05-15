@@ -130,9 +130,17 @@ def format_profile_for_prompt(profile: dict) -> str:
 
     children = profile.get("children", [])
     if children:
-        current_year = datetime.date.today().year
-        ages = [current_year - c["birth_year"] for c in children]
-        lines.append(f"\nHas children aged: {', '.join(str(a) for a in ages)}")
+        today = datetime.date.today()
+        ages = []
+        for c in children:
+            if "stated_age" in c and "as_of" in c:
+                as_of = datetime.date.fromisoformat(c["as_of"])
+                years_passed = today.year - as_of.year
+                ages.append(c["stated_age"] + years_passed)
+            elif "birth_year" in c:
+                ages.append(today.year - c["birth_year"])
+        if ages:
+            lines.append(f"\nHas children aged: {', '.join(str(a) for a in ages)}")
 
     platforms = profile.get("streaming_platforms", [])
     if platforms:
