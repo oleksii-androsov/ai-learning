@@ -9,7 +9,9 @@ client = anthropic.Anthropic()
 
 # Keywords that suggest a message may contain profile-worthy information
 _EXTRACTION_TRIGGERS = [
-    "watch", "seen", "liked", "loved", "hated", "enjoyed", "didn't like", "don't like",
+    "watch", "seen", "liked", "loved", "love", "hated", "hate", "enjoyed", "enjoy",
+    "didn't like", "don't like", "not a fan",
+    "movie", "film", "director", "tarantino", "nolan", "spielberg",
     "genre", "comedy", "sci-fi", "fantasy", "horror", "thriller", "drama", "animation",
     "kids", "children", "daughter", "son", "family", "years old",
     "netflix", "prime", "disney", "hbo", "apple tv", "streaming", "subscribe",
@@ -54,9 +56,11 @@ Return only the updated combined summary — a single paragraph merging prior hi
 def should_extract(user_message: str) -> bool:
     """Quick heuristic — skip Haiku call for short/trivial messages."""
     msg = user_message.lower()
-    if len(msg.split()) < 8:
+    if len(msg.split()) < 5:
         return False
-    return any(trigger in msg for trigger in _EXTRACTION_TRIGGERS)
+    result = any(trigger in msg for trigger in _EXTRACTION_TRIGGERS)
+    logger.warning(f"should_extract={result} for: {msg[:80]}")
+    return result
 
 
 def extract_profile_updates(conversation: list, existing_profile: dict) -> tuple:
@@ -95,10 +99,12 @@ def extract_profile_updates(conversation: list, existing_profile: dict) -> tuple
         return existing_profile, False
 
     if not updates:
+        logger.warning("Extractor returned empty updates — nothing to save")
         return existing_profile, False
 
     merged = _merge(existing_profile, updates)
     changed = merged != existing_profile
+    logger.warning(f"Extraction complete — changed={changed}, updates={list(updates.keys())}")
     return merged, changed
 
 
