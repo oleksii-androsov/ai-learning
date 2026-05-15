@@ -31,6 +31,13 @@ def show_auth_sidebar(session_state, controller):
     if session_state.get("user_id"):
         return
 
+    # CookieController needs one render cycle to initialise before cookies are readable.
+    # On the very first render we set a flag and rerun — on the second render the cookie
+    # value is available and we can decide whether to show the email form.
+    if not session_state.get("_cookie_checked"):
+        session_state["_cookie_checked"] = True
+        st.rerun()
+
     user_id = resolve_user(session_state, controller)
     if user_id:
         return
