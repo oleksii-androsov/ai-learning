@@ -134,11 +134,11 @@ def format_profile_for_prompt(profile: dict) -> str:
         ages = []
         for c in children:
             if "stated_age" in c and "as_of" in c:
-                as_of = datetime.date.fromisoformat(c["as_of"])
-                years_passed = today.year - as_of.year
-                ages.append(c["stated_age"] + years_passed)
+                as_of = datetime.date.fromisoformat(str(c["as_of"]))
+                years_passed = (today - as_of).days // 365
+                ages.append(int(c["stated_age"]) + years_passed)
             elif "birth_year" in c:
-                ages.append(today.year - c["birth_year"])
+                ages.append(today.year - int(c["birth_year"]))
         if ages:
             lines.append(f"\nHas children aged: {', '.join(str(a) for a in ages)}")
 

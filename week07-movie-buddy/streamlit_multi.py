@@ -205,10 +205,11 @@ with st.sidebar:
                     ages = []
                     for c in profile["children"]:
                         if "stated_age" in c and "as_of" in c:
-                            as_of = _dt.date.fromisoformat(c["as_of"])
-                            ages.append(c["stated_age"] + (today.year - as_of.year))
+                            as_of = _dt.date.fromisoformat(str(c["as_of"]))
+                            years_passed = (today - as_of).days // 365
+                            ages.append(int(c["stated_age"]) + years_passed)
                         elif "birth_year" in c:
-                            ages.append(today.year - c["birth_year"])
+                            ages.append(today.year - int(c["birth_year"]))
                     if ages:
                         st.markdown(f"**Kids:** ages {', '.join(str(a) for a in ages)}")
                 if profile.get("weather_preference"):
