@@ -57,7 +57,10 @@ def show_auth_sidebar(session_state, controller):
                 return
             user_id = _email_to_user_id(email)
 
-            existing_token = controller.get(COOKIE_NAME)
+            try:
+                existing_token = controller.get(COOKIE_NAME)
+            except TypeError:
+                existing_token = None
             if existing_token and get_user_id_for_device(existing_token) == user_id:
                 device_token = existing_token
             else:
