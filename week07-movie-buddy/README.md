@@ -35,6 +35,21 @@ Three bugs fixed in the weather → recommendation pipeline:
 
 **Key lesson:** LLMs will find creative ways around vague instructions. "Rain means streaming" is not the same as "rain means streaming, never rationalise rain as a cinema reason." The rule needs to leave no room for interpretation.
 
+### Day 2 — DynamoDB persistent memory
+
+Three new modules: `memory.py` (DynamoDB read/write), `profile_extractor.py` (Haiku-based fact extraction), `auth.py` (email-based identity). Three DynamoDB tables: `movie_buddy_profiles`, `movie_buddy_summaries`, `movie_buddy_devices`.
+
+**How it works:** After each assistant reply, a heuristic checks if the user's message is likely to contain profile-worthy information (trigger words: "liked", "watched", "kids", "netflix", etc., minimum 5 words). If yes, Haiku reads the full conversation and extracts structured facts — movies watched with opinions, genre preferences, children's ages, streaming platforms, weather preference. The extracted facts are merged into the existing profile and written to DynamoDB. The Orchestrator gets the profile and a rolling conversation summary injected into its system prompt at session start.
+
+**Bugs fixed along the way:**
+- DynamoDB silently rejects Python `None` values with a `TypeError` not caught by `except (BotoCoreError, ClientError)` — fixed by stripping `None` values before writing and catching all exceptions
+- Profile overwrite bug: loading a non-existent profile created and saved an empty one, wiping any existing data — fixed by never saving on load
+- Haiku date hallucination: asked to record `as_of` date for children's ages, it wrote `2025-01-10` — fixed by stamping the date in Python, not asking the model
+- Shallow copy bug: `dict(existing)` shares nested list objects, so merged profile always equalled the original — `changed` was always `False` and nothing ever wrote to DynamoDB — fixed with `copy.deepcopy()`
+- Cookie persistence: three approaches failed (streamlit-cookies-controller, st.context.cookies + JS iframe, URL query params). Root cause: Streamlit component iframes can't write to the parent page's cookie jar. Temporary fix: ask for email each session, persist profile by email hash. Auth0 integration planned next.
+
+**Memory sidebar:** profile data visible in real time — genres, platforms, kids' ages (computed from stated age + date stated, not birth year), weather preference, movies watched count. Changes detected this session shown as a live feed.
+
 ## Key architectural decisions (inherited from Week 6)
 
 - **Orchestrator has no tools** — pure reasoning layer. Adding tools to the orchestrator would blur the separation of concerns and make it harder to debug which specialist is responsible for what.
