@@ -9,6 +9,7 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 sys.path.insert(0, os.path.dirname(__file__))
 
 import streamlit as st
+from streamlit_cookies_controller import CookieController
 from dotenv import load_dotenv
 from multi_agent import process_message
 from auth import resolve_user, show_auth_sidebar
@@ -22,6 +23,9 @@ from profile_extractor import extract_profile_updates, update_summary, should_ex
 load_dotenv()
 
 st.set_page_config(page_title="Movie Buddy", page_icon="🎬", layout="centered")
+
+# Must be instantiated before any other st. calls so the component initialises first
+cookie_controller = CookieController()
 
 st.markdown("""
 <style>
@@ -147,8 +151,8 @@ for key, default in [
 
 # ---------- Auth ----------
 
-show_auth_sidebar(st.session_state)
-user_id = resolve_user(st.session_state)
+show_auth_sidebar(st.session_state, cookie_controller)
+user_id = resolve_user(st.session_state, cookie_controller)
 
 # ---------- Load profile once per session ----------
 

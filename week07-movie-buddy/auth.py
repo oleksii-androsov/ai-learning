@@ -2,29 +2,20 @@ import hashlib
 import uuid
 from typing import Optional
 import streamlit as st
-from streamlit_cookies_controller import CookieController
 from memory import get_user_id_for_device, register_device
 
 COOKIE_NAME = "mb_device_token"
-
-# One controller instance per session
-def _controller() -> CookieController:
-    if "_cookie_controller" not in st.session_state:
-        st.session_state._cookie_controller = CookieController()
-    return st.session_state._cookie_controller
 
 
 def _email_to_user_id(email: str) -> str:
     return hashlib.sha256(email.strip().lower().encode()).hexdigest()[:16]
 
 
-def resolve_user(session_state) -> Optional[str]:
+def resolve_user(session_state, controller) -> Optional[str]:
     """Return user_id if known this session, else None."""
     if "user_id" in session_state:
         return session_state["user_id"]
 
-    # Try reading device token from cookie
-    controller = _controller()
     device_token = controller.get(COOKIE_NAME)
     if device_token:
         user_id = get_user_id_for_device(device_token)
@@ -35,13 +26,12 @@ def resolve_user(session_state) -> Optional[str]:
     return None
 
 
-def show_auth_sidebar(session_state):
+def show_auth_sidebar(session_state, controller):
     """Render auth UI in sidebar. Sets session_state.user_id when resolved."""
     if session_state.get("user_id"):
         return
 
-    # Try cookie first (may succeed on rerun after controller initialises)
-    user_id = resolve_user(session_state)
+    user_id = resolve_user(session_state, controller)
     if user_id:
         return
 
@@ -56,8 +46,6 @@ def show_auth_sidebar(session_state):
                 return
             user_id = _email_to_user_id(email)
 
-            # Reuse existing device token for this browser if one exists
-            controller = _controller()
             existing_token = controller.get(COOKIE_NAME)
             if existing_token and get_user_id_for_device(existing_token) == user_id:
                 device_token = existing_token
