@@ -1,5 +1,6 @@
 """Uses Haiku to extract user facts from a conversation and update the profile."""
 import json
+import copy
 import logging
 import datetime
 import anthropic
@@ -113,7 +114,7 @@ def _merge(existing: dict, updates: dict) -> dict:
     if not updates:
         return existing
 
-    merged = dict(existing)
+    merged = copy.deepcopy(existing)
 
     if "movies" in updates:
         existing_titles = {m["title"].lower() for m in merged.get("movies", [])}
