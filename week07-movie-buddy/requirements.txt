@@ -3,3 +3,4 @@ python-dotenv
 requests
 tavily-python
 datadog
+boto3

@@ -8,6 +8,13 @@ sys.path.insert(0, os.path.dirname(__file__))
 import streamlit as st
 from dotenv import load_dotenv
 from multi_agent import process_message
+from auth import resolve_user, show_auth_sidebar
+from memory import (
+    get_profile, save_profile, empty_profile,
+    get_summary, save_summary,
+    format_profile_for_prompt, format_summary_for_prompt,
+)
+from profile_extractor import extract_profile_updates, update_summary
 
 load_dotenv()
 
@@ -60,7 +67,6 @@ TMDB_IMG     = "https://image.tmdb.org/t/p/w780"
 
 
 def fetch_posters(titles):
-    """Fetch TMDB poster URLs for a list of titles provided by the Orchestrator."""
     if not TMDB_API_KEY or not titles:
         return {}
 
@@ -77,8 +83,6 @@ def fetch_posters(titles):
                 top = results[0]
                 result_title = top.get("title", "").lower()
                 query_lower  = query.lower()
-                # query must equal or be a substring of the result title — not the reverse,
-                # which would let "Zootopia" match a search for "Zootopia 2"
                 if (result_title == query_lower or query_lower in result_title):
                     if top.get("poster_path"):
                         return title, TMDB_IMG + top["poster_path"]
@@ -93,7 +97,6 @@ def fetch_posters(titles):
 
 
 def render_reply(text, posters):
-    """Render reply with posters inserted after the paragraph that first names each title."""
     text = re.sub(r'\n\s*---\s*\n', '\n\n', text)
     if not posters:
         st.markdown(text)
@@ -107,11 +110,6 @@ def render_reply(text, posters):
                 st.image(url, use_container_width=True)
                 st.caption(title)
                 used.add(title)
-
-
-if "messages"        not in st.session_state: st.session_state.messages        = []
-if "display_history" not in st.session_state: st.session_state.display_history = []
-if "pending_prompt"  not in st.session_state: st.session_state.pending_prompt  = None
 
 
 def render_expander(calls, total_elapsed, key):
@@ -129,7 +127,78 @@ def render_expander(calls, total_elapsed, key):
             )
 
 
-# Welcome screen — only when no conversation and nothing pending
+# ---------- Session state init ----------
+
+for key, default in [
+    ("messages", []),
+    ("display_history", []),
+    ("pending_prompt", None),
+    ("profile_loaded", False),
+    ("profile", {}),
+    ("prior_summary", ""),
+    ("session_ended", False),
+]:
+    if key not in st.session_state:
+        st.session_state[key] = default
+
+# ---------- Auth ----------
+
+show_auth_sidebar(st.session_state)
+user_id = resolve_user(st.session_state)
+
+# ---------- Load profile once per session ----------
+
+if user_id and not st.session_state.profile_loaded:
+    profile = get_profile(user_id)
+    if not profile:
+        profile = empty_profile(user_id)
+        save_profile(user_id, profile)
+    st.session_state.profile = profile
+    st.session_state.prior_summary = get_summary(user_id)
+    st.session_state.profile_loaded = True
+
+# ---------- Build user context for Orchestrator ----------
+
+user_context = ""
+if user_id and st.session_state.profile:
+    parts = []
+    profile_text = format_profile_for_prompt(st.session_state.profile)
+    summary_text = format_summary_for_prompt(st.session_state.prior_summary)
+    if profile_text:
+        parts.append(profile_text)
+    if summary_text:
+        parts.append(summary_text)
+    user_context = "\n\n".join(parts)
+
+# ---------- Sidebar: session controls ----------
+
+with st.sidebar:
+    if user_id:
+        st.markdown(f"**Signed in** ✓")
+        st.markdown("---")
+    if st.session_state.messages and not st.session_state.session_ended:
+        if st.button("End session & save memory"):
+            with st.spinner("Saving your preferences..."):
+                updated_profile = extract_profile_updates(
+                    st.session_state.messages,
+                    st.session_state.profile,
+                )
+                if updated_profile != st.session_state.profile:
+                    save_profile(user_id, updated_profile)
+                    st.session_state.profile = updated_profile
+
+                new_summary = update_summary(
+                    user_id,
+                    st.session_state.messages,
+                    st.session_state.prior_summary,
+                )
+                save_summary(user_id, new_summary)
+                st.session_state.prior_summary = new_summary
+                st.session_state.session_ended = True
+            st.success("Memory saved!")
+
+# ---------- Main chat UI ----------
+
 if not st.session_state.display_history and not st.session_state.pending_prompt:
     st.markdown("#### What can I help you find?")
     cols = st.columns(2)
@@ -138,7 +207,6 @@ if not st.session_state.display_history and not st.session_state.pending_prompt:
             st.session_state.pending_prompt = example
             st.rerun()
 
-# Render conversation history
 for i, entry in enumerate(st.session_state.display_history):
     with st.chat_message(entry["role"]):
         if entry["role"] == "assistant":
@@ -148,7 +216,6 @@ for i, entry in enumerate(st.session_state.display_history):
     if entry.get("calls"):
         render_expander(entry["calls"], entry.get("total_elapsed"), key=f"hist_expander_{i}")
 
-# Chat input — example button clicks feed through pending_prompt
 prompt = st.chat_input("Ask about movies...")
 if st.session_state.pending_prompt:
     prompt = st.session_state.pending_prompt
@@ -163,12 +230,16 @@ if prompt:
 
     with st.chat_message("assistant"):
         with st.spinner("Consulting the team..."):
-            reply, calls, total_elapsed, poster_titles = process_message(st.session_state.messages)
+            reply, calls, total_elapsed, poster_titles = process_message(
+                st.session_state.messages,
+                user_context=user_context,
+            )
         posters = fetch_posters(poster_titles) if poster_titles else {}
         render_reply(reply, posters)
         if calls:
             render_expander(calls, total_elapsed, key=f"live_expander_{len(st.session_state.display_history)}")
 
+    st.session_state.messages.append({"role": "assistant", "content": reply})
     st.session_state.display_history.append({
         "role":          "assistant",
         "content":       reply,

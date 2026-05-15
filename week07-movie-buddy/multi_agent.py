@@ -254,7 +254,7 @@ def _parse_posters(reply):
     return clean, titles
 
 
-def process_message(messages):
+def process_message(messages, user_context: str = ""):
     """Run one orchestrator turn. Appends to messages in place.
     Returns (reply, specialist_calls_log, total_specialist_elapsed_s, poster_titles)."""
     calls_log = []
@@ -292,6 +292,8 @@ def process_message(messages):
             today = datetime.date.today()
             day_name = today.strftime("%A")
             system = ORCHESTRATOR_PROMPT + f"\n\nToday is {day_name}, {today.isoformat()}. Use this to interpret relative terms like 'this weekend', 'next week', 'tomorrow'."
+            if user_context:
+                system += f"\n\n{user_context}"
             response = client.messages.create(
                 model="claude-sonnet-4-6",
                 max_tokens=2048,
