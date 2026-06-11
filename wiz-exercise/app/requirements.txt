@@ -3,4 +3,5 @@ python-dotenv
 requests
 tavily-python
 datadog
-boto3
+pymongo
+streamlit

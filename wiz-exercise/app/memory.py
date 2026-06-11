@@ -1,69 +1,74 @@
 import datetime
 import logging
+import os
 from typing import Optional
-import boto3
-from botocore.exceptions import BotoCoreError, ClientError
+from pymongo import MongoClient
+from pymongo.errors import PyMongoError
 
 logger = logging.getLogger(__name__)
 
 try:
-    dynamodb = boto3.resource("dynamodb", region_name="eu-central-1")
-    profiles_table  = dynamodb.Table("movie_buddy_profiles")
-    summaries_table = dynamodb.Table("movie_buddy_summaries")
-    devices_table   = dynamodb.Table("movie_buddy_devices")
-    _DYNAMO_AVAILABLE = True
+    _client = MongoClient(os.environ["MONGO_URL"], serverSelectionTimeoutMS=3000)
+    _db = _client["movie_buddy"]
+    profiles_col  = _db["profiles"]
+    summaries_col = _db["summaries"]
+    devices_col   = _db["devices"]
+    _MONGO_AVAILABLE = True
 except Exception:
-    _DYNAMO_AVAILABLE = False
-    logger.warning("DynamoDB unavailable — memory features disabled")
+    _MONGO_AVAILABLE = False
+    logger.warning("MongoDB unavailable — memory features disabled")
 
 
 # ---------- Device token → user_id mapping ----------
 
 def get_user_id_for_device(device_token: str) -> Optional[str]:
-    if not _DYNAMO_AVAILABLE:
+    if not _MONGO_AVAILABLE:
         return None
     try:
-        resp = devices_table.get_item(Key={"device_token": device_token})
-        item = resp.get("Item")
+        item = devices_col.find_one({"device_token": device_token})
         return item["user_id"] if item else None
-    except (BotoCoreError, ClientError) as e:
-        logger.warning(f"DynamoDB get_user_id_for_device failed: {e}")
+    except PyMongoError as e:
+        logger.warning(f"MongoDB get_user_id_for_device failed: {e}")
         return None
 
 
 def register_device(device_token: str, user_id: str):
-    if not _DYNAMO_AVAILABLE:
+    if not _MONGO_AVAILABLE:
         return
     try:
-        devices_table.put_item(Item={"device_token": device_token, "user_id": user_id})
-    except Exception as e:
-        logger.warning(f"DynamoDB register_device failed: {e}")
+        devices_col.replace_one(
+            {"device_token": device_token},
+            {"device_token": device_token, "user_id": user_id},
+            upsert=True
+        )
+    except PyMongoError as e:
+        logger.warning(f"MongoDB register_device failed: {e}")
 
 
 # ---------- User profile ----------
 
 def get_profile(user_id: str) -> dict:
-    if not _DYNAMO_AVAILABLE:
+    if not _MONGO_AVAILABLE:
         return {}
     try:
-        resp = profiles_table.get_item(Key={"user_id": user_id})
-        return resp.get("Item", {})
-    except (BotoCoreError, ClientError) as e:
-        logger.warning(f"DynamoDB get_profile failed: {e}")
+        item = profiles_col.find_one({"user_id": user_id})
+        if item:
+            item.pop("_id", None)
+        return item or {}
+    except PyMongoError as e:
+        logger.warning(f"MongoDB get_profile failed: {e}")
         return {}
 
 
 def save_profile(user_id: str, profile: dict):
-    if not _DYNAMO_AVAILABLE:
+    if not _MONGO_AVAILABLE:
         return
     try:
         profile["user_id"] = user_id
         profile["updated_at"] = datetime.date.today().isoformat()
-        # DynamoDB rejects None values — strip them before writing
-        clean = {k: v for k, v in profile.items() if v is not None}
-        profiles_table.put_item(Item=clean)
-    except Exception as e:
-        logger.warning(f"DynamoDB save_profile failed: {e}")
+        profiles_col.replace_one({"user_id": user_id}, profile, upsert=True)
+    except PyMongoError as e:
+        logger.warning(f"MongoDB save_profile failed: {e}")
 
 
 def empty_profile(user_id: str) -> dict:
@@ -81,28 +86,27 @@ def empty_profile(user_id: str) -> dict:
 # ---------- Conversation summaries ----------
 
 def get_summary(user_id: str) -> str:
-    if not _DYNAMO_AVAILABLE:
+    if not _MONGO_AVAILABLE:
         return ""
     try:
-        resp = summaries_table.get_item(Key={"user_id": user_id})
-        item = resp.get("Item")
+        item = summaries_col.find_one({"user_id": user_id})
         return item["summary"] if item else ""
-    except (BotoCoreError, ClientError) as e:
-        logger.warning(f"DynamoDB get_summary failed: {e}")
+    except PyMongoError as e:
+        logger.warning(f"MongoDB get_summary failed: {e}")
         return ""
 
 
 def save_summary(user_id: str, summary: str):
-    if not _DYNAMO_AVAILABLE:
+    if not _MONGO_AVAILABLE:
         return
     try:
-        summaries_table.put_item(Item={
-            "user_id": user_id,
-            "summary": summary,
-            "updated_at": datetime.date.today().isoformat(),
-        })
-    except Exception as e:
-        logger.warning(f"DynamoDB save_summary failed: {e}")
+        summaries_col.replace_one(
+            {"user_id": user_id},
+            {"user_id": user_id, "summary": summary, "updated_at": datetime.date.today().isoformat()},
+            upsert=True
+        )
+    except PyMongoError as e:
+        logger.warning(f"MongoDB save_summary failed: {e}")
 
 
 # ---------- Profile formatting for Orchestrator prompt ----------
