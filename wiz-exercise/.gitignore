@@ -1,0 +1,4 @@
+wiz-exercise-key
+*.tfstate
+*.tfstate.backup
+.terraform/
