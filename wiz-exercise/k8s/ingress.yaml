@@ -1,0 +1,34 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: movie-buddy-svc
+  namespace: default
+spec:
+  selector:
+    app: movie-buddy
+  ports:
+    - port: 80
+      targetPort: 8501
+  type: ClusterIP
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: movie-buddy-ingress
+  namespace: default
+  annotations:
+    alb.ingress.kubernetes.io/scheme: internet-facing
+    alb.ingress.kubernetes.io/target-type: ip
+    alb.ingress.kubernetes.io/subnets: subnet-0ff157fc4e19364bf,subnet-021559705afaa1132
+spec:
+  ingressClassName: alb
+  rules:
+    - http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: movie-buddy-svc
+                port:
+                  number: 80

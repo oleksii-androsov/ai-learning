@@ -136,7 +136,7 @@ def _merge(existing: dict, updates: dict) -> dict:
         merged["children"] = [
             {"stated_age": c["stated_age"], "as_of": today}
             for c in updates["children"]
-            if "stated_age" in c
+            if "stated_age" in c and c["stated_age"] is not None
         ]
 
     if "streaming_platforms" in updates:

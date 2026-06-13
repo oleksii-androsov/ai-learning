@@ -200,7 +200,7 @@ with st.sidebar:
                     today = _dt.date.today()
                     ages = []
                     for c in profile["children"]:
-                        if "stated_age" in c and "as_of" in c:
+                        if "stated_age" in c and "as_of" in c and c["stated_age"] is not None:
                             as_of = _dt.date.fromisoformat(str(c["as_of"]))
                             years_passed = (today - as_of).days // 365
                             ages.append(int(c["stated_age"]) + years_passed)
