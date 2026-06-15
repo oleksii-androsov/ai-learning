@@ -56,8 +56,7 @@ jobs:
 
       - name: Deploy to EKS
         run: |
-          mkdir -p ~/.kube
-          echo "${{ secrets.KUBE_CONFIG }}" | base64 -d > ~/.kube/config
+          aws eks update-kubeconfig --region $AWS_REGION --name movie-buddy
           kubectl set image deployment/movie-buddy \
             movie-buddy=${{ steps.login-ecr.outputs.registry }}/$ECR_REPOSITORY:$IMAGE_TAG
           kubectl rollout status deployment/movie-buddy --timeout=120s
