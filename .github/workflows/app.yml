@@ -1,0 +1,63 @@
+name: App CI/CD
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'wiz-exercise/app/**'
+
+env:
+  AWS_REGION: us-east-1
+  ECR_REPOSITORY: movie-buddy
+  IMAGE_TAG: ${{ github.sha }}
+
+jobs:
+  scan:
+    name: Trivy vulnerability scan
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Run Trivy on Dockerfile
+        uses: aquasecurity/trivy-action@master
+        with:
+          scan-type: fs
+          scan-ref: wiz-exercise/app
+          severity: CRITICAL,HIGH
+          exit-code: 0
+
+  build-and-deploy:
+    name: Build, push, deploy
+    runs-on: ubuntu-latest
+    needs: scan
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Login to ECR
+        id: login-ecr
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Build and push Docker image
+        run: |
+          ECR_REGISTRY=${{ steps.login-ecr.outputs.registry }}
+          docker build --platform linux/amd64 \
+            -t $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG \
+            -t $ECR_REGISTRY/$ECR_REPOSITORY:latest \
+            wiz-exercise/app
+          docker push $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG
+          docker push $ECR_REGISTRY/$ECR_REPOSITORY:latest
+
+      - name: Deploy to EKS
+        run: |
+          mkdir -p ~/.kube
+          echo "${{ secrets.KUBE_CONFIG }}" | base64 -d > ~/.kube/config
+          kubectl set image deployment/movie-buddy \
+            movie-buddy=${{ steps.login-ecr.outputs.registry }}/$ECR_REPOSITORY:$IMAGE_TAG
+          kubectl rollout status deployment/movie-buddy --timeout=120s
