@@ -23,3 +23,14 @@ output "mongodb_url" {
   value       = "mongodb://${var.mongodb_username}:${var.mongodb_password}@${aws_instance.mongodb.public_ip}:27017"
   sensitive   = true
 }
+
+output "eks_cluster_name" {
+  description = "EKS cluster name"
+  value       = aws_eks_cluster.main.name
+}
+
+output "eks_cluster_endpoint" {
+  description = "EKS cluster API endpoint"
+  value       = aws_eks_cluster.main.endpoint
+}
+# CI/CD test
