@@ -245,3 +245,78 @@ ssh -i wiz-exercise/wiz-exercise-key ubuntu@100.52.232.237
 # Check MongoDB version
 ssh -i wiz-exercise/wiz-exercise-key ubuntu@100.52.232.237 "mongod --version && lsb_release -a"
 ```
+
+---
+
+## IMAGE PROMPTS FOR CHATGPT
+
+Visual style guidance for all images:
+- Dark navy background (#0a0e1a) for full-bleed slides (title, closing)
+- Dark charcoal (#1e2433) for content cards and boxes
+- Electric blue (#00B4D8) for arrows, accents, highlights
+- Red (#FF4444) for warnings, security findings, critical items
+- Green (#00C875) for resolved, positive, compliant items
+- White text on dark backgrounds
+- Flat vector illustration style — no 3D, no photo-realism, no gradients except subtle glows
+- Clean, modern, enterprise security aesthetic — inspired by Wiz.io visual language
+- All images 16:9 widescreen format, no text unless specified
+
+---
+
+### Slide 1 — Title background
+
+Dark navy background (#0a0e1a). Centered composition. A stylized AWS cloud architecture diagram rendered as glowing neon lines on dark background — showing a Kubernetes cluster icon, a database cylinder, an S3 bucket, and a load balancer connected by flowing electric-blue (#00B4D8) lines. Flat vector illustration style, no gradients except subtle blue glow effects. No text. Modern enterprise security aesthetic inspired by Wiz.io. 16:9 widescreen format.
+
+---
+
+### Slide 3 — Architecture diagram
+
+Clean AWS architecture diagram. Show left to right: Internet user icon → DNS/Route53 → Application Load Balancer (with padlock/SSL icon) → EKS cluster box (containing a Kubernetes pod icon labeled "MovieBuddy") → MongoDB cylinder on EC2 instance → S3 bucket for backups. Use AWS-style flat service icons. Color scheme: dark navy (#0a0e1a) background, electric blue (#00B4D8) for connection arrows, white labels. Add small red warning triangle icons on: EC2 (SSH open to internet), S3 (public bucket), IAM badge on EC2 (overpermissive), Kubernetes pod (cluster-admin). Flat 2D diagram, clean lines, no shadows. 16:9 widescreen.
+
+---
+
+### Slide 4 — MovieBuddy app mockup
+
+Dark-themed chat UI mockup. Split composition: left two-thirds shows a chat interface with dark background (#1e2433), a conversation about movie recommendations, movie poster thumbnails arranged in a row, and four colored specialist agent badges at the top (blue "Tracker", green "Explorer", orange "Fact-Checker", purple "Planner"). Right one-third shows a sidebar panel with user profile data — genre preferences, kids ages, streaming platforms listed. Electric blue and purple accent colors. Clean sans-serif typography feel. Flat design illustration, not a real screenshot. 16:9 widescreen.
+
+---
+
+### Slide 5 — Business benefits vs risks
+
+Two-panel infographic on dark navy background (#0a0e1a). Left panel labeled "Business Value" — three items each with a green checkmark circle icon: "Automated Deployment", "Horizontally Scalable", "Full Audit Trail". Right panel labeled "Security Risks" — four items each with a red warning triangle icon: "SSH Exposed to Internet", "Over-Privileged IAM Role", "Credentials in Public S3", "Unpatched CVEs". Vertical electric blue dividing line between panels. White text, flat icon style. No decorative elements. Clean enterprise look. 16:9 widescreen.
+
+---
+
+### Slide 6 — DevSecOps pipeline diagram
+
+Horizontal pipeline flow diagram on dark navy background. Two parallel pipeline tracks stacked vertically with a label on the left of each. Top track labeled "Infra Pipeline": connected boxes left to right — "Git Push" → "Checkov Scan" (red security shield icon) → "Terraform Plan" (document icon) → "Manual Approval" (human/pause icon, amber color) → "Terraform Apply" → "AWS" (cloud icon). Bottom track labeled "App Pipeline": "Git Push" → "Trivy Scan" (red shield) → "Docker Build" → "ECR Push" → "kubectl rollout" → "EKS" (Kubernetes wheel icon). Electric blue (#00B4D8) arrows connecting boxes. Boxes in dark charcoal (#1e2433) with white text. Security scan steps have red accent, deploy steps have green accent. Flat vector style. 16:9 widescreen.
+
+---
+
+### Slide 7 — Challenges faced
+
+Four-card grid layout on dark navy background. Cards are dark charcoal (#1e2433) rounded rectangles arranged in a 2x2 grid. Each card has: a small icon at top, a short bold title, and 1-line description. Card 1: Docker whale icon — "ARM→AMD64" — "Cross-platform build with docker buildx". Card 2: Network/subnet icon — "ALB Subnet Discovery" — "Missing Kubernetes cluster tags on subnets". Card 3: Lightning/websocket icon — "WebSocket Stability" — "Sticky sessions required for Streamlit behind ALB". Card 4: Database/cloud icon — "Terraform Remote State" — "Migrated tfstate to S3 for CI/CD access". Each card has a small amber "challenge" dot in top-right corner and a green checkmark "resolved" badge in bottom-right. Electric blue border accent on each card. Flat icon style, white text, equal spacing. 16:9 widescreen.
+
+---
+
+### Slide 8 — Security findings dashboard
+
+Security findings dashboard aesthetic on dark navy background. Five tool labels across the top row as column headers: "Checkov", "Trivy", "AWS Inspector", "GuardDuty", "AWS Config / CloudTrail". Below each header, 2 finding cards in dark charcoal (#1e2433). Cards have colored left-border severity indicator: red = CRITICAL, orange = HIGH. Sample finding labels (white text, small): under Checkov — "SSH open 0.0.0.0/0", "AdministratorAccess IAM"; under Inspector — "MongoDB 4.4 CVEs", "Ubuntu 20.04 EOL"; under GuardDuty — "Runtime monitoring active"; under Config/CloudTrail — "Config drift detection", "Full API audit log". Bottom of composition: large counter badge "10 Findings Detected" in red. Flat design, no gradients. 16:9 widescreen.
+
+---
+
+### Slide 9 — Wiz value / attack path
+
+Split composition on dark navy background. Left half labeled "Without Wiz" (slightly muted/gray): Six isolated tool icons scattered — Checkov, Trivy, Inspector, GuardDuty, Config, CloudTrail — each in its own separate box with no connections between them, red warning icons floating disconnected, chaotic arrangement suggesting fragmentation and alert fatigue. Right half labeled "With Wiz" (vivid, electric blue accents): A clean connected graph — nodes labeled "Public Internet" → "Public S3 Bucket" → "Terraform State File" → "MongoDB Credentials" → "Database" — connected by a glowing red attack path arrow showing the full chain. Below the graph: "1 Critical Attack Path" in bold red. Vertical dividing line in electric blue between the two halves. Flat vector style. 16:9 widescreen.
+
+---
+
+### Slide 10 — What would you do differently (roadmap)
+
+Four-step improvement roadmap on dark navy background. Horizontal timeline with four numbered circular nodes (1, 2, 3, 4) connected by a progress bar line. Color gradient from amber/orange on the left (current state) to bright green on the right (target state). Node 1 (amber): key/lock icon — "Secrets Manager + ESO" below. Node 2: shield icon — "IMDSv2 + Immutable ECR". Node 3: chain/link icon — "OIDC Federation". Node 4 (green): network diagram icon — "Private Subnet + VPC Endpoints". Below each node, a small dark charcoal card with 2-line description. Above the timeline: small label "Current State" on left, "Production Ready" on right. Flat vector style, white text. 16:9 widescreen.
+
+---
+
+### Slide 11 — Resources (minimal)
+
+Minimal clean composition on dark navy background. Simple grid of 5 resource cards arranged in two rows. Each card: dark charcoal (#1e2433) rounded rectangle, subtle electric blue left-border accent, a small logo placeholder circle on the left, and two lines of white text (resource name + short description). Cards: "AWS EKS Documentation", "AWS Load Balancer Controller", "Terraform AWS Provider", "Checkov by Bridgecrew", "Wiz Blog — Attack Path Methodology". Clean sans-serif typography feel. No decorative elements. Understated, professional. 16:9 widescreen.
