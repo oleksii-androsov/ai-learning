@@ -3,6 +3,19 @@
 
 ---
 
+## Visual style guidance for all ChatGPT image prompts
+- Dark navy background (#0a0e1a) for full-bleed slides
+- Dark charcoal (#1e2433) for content cards and boxes
+- Electric blue (#00B4D8) for arrows, accents, highlights
+- Red (#FF4444) for warnings, security findings, critical items
+- Green (#00C875) for resolved, positive, compliant items
+- White text on dark backgrounds
+- Flat vector illustration style — no 3D, no photo-realism, no gradients except subtle glows
+- Clean, modern, enterprise security aesthetic inspired by Wiz.io visual language
+- All images 16:9 widescreen format
+
+---
+
 ## BEFORE YOU START — Meeting management checklist
 - Ask for introductions round: "Before I dive in, I'd love to go around and hear who's joining and what you're most curious to see"
 - Take notes as people answer
@@ -14,26 +27,39 @@
 
 ## Slide 1 — Title (1 min)
 
+**Speaker notes:**
 "Good morning / afternoon everyone. Thank you for having me. Before I dive in — I'd love to quickly go around and hear who's joining today and what you're most curious to see. That way I can make sure I address what matters most to each of you."
 
 *(Take notes as people answer)*
+
+**Slide content:** Title: "Securing a Cloud-Native Application on AWS". Subtitle: "A DevSecOps Exercise — Oleksii Androsov"
+
+**ChatGPT image prompt:**
+Dark navy background (#0a0e1a). Centered composition. A stylized AWS cloud architecture diagram rendered as glowing neon lines on dark background — showing a Kubernetes cluster icon, a database cylinder, an S3 bucket, and a load balancer connected by flowing electric-blue (#00B4D8) lines. Flat vector illustration style, no gradients except subtle blue glow effects. No text. Modern enterprise security aesthetic inspired by Wiz.io. 16:9 widescreen format.
 
 ---
 
 ## Slide 3 — Overview / Architecture (3 min)
 
+**Speaker notes:**
 "The exercise asked me to deploy a real, working cloud application — deliberately configured with security weaknesses that you'd realistically find in enterprise environments built under delivery pressure.
 
 I chose to build MovieBuddy: an AI-powered movie recommendation chatbot that uses Claude and real-time web search. It's a multi-agent system — not a toy app. Here's the architecture."
 
-*(Point to architecture diagram)*
+*(Point to architecture diagram on slide)*
 
 "The application runs in a containerized Kubernetes cluster on EKS — in private subnets. Traffic comes in through an AWS Application Load Balancer with HTTPS termination via ACM certificates. The database is MongoDB running on EC2 — and I've built in several intentional security weaknesses that we'll get to shortly. The whole infrastructure is defined as code in Terraform and deployed via GitHub Actions CI/CD pipelines."
+
+**Slide content:** One-liner description + architecture diagram image
+
+**ChatGPT image prompt:**
+Clean AWS architecture diagram on dark navy background (#0a0e1a). Show left to right: Internet user icon → DNS/Route53 → Application Load Balancer (with padlock/SSL icon) → EKS cluster box (containing a Kubernetes pod icon labeled "MovieBuddy") → MongoDB cylinder on EC2 instance → S3 bucket for backups. Use AWS-style flat service icons. Electric blue (#00B4D8) connection arrows, white labels. Add small red warning triangle icons on: EC2 (SSH open to internet), S3 (public bucket), IAM badge on EC2 (overpermissive), Kubernetes pod (cluster-admin). Flat 2D diagram, clean lines, no shadows. 16:9 widescreen.
 
 ---
 
 ## Slide 4 — What You Built — LIVE DEMO (5 min)
 
+**Speaker notes:**
 "Let me show you the application live."
 
 *(Switch to browser — open https://movie-buddy.app)*
@@ -49,13 +75,12 @@ I chose to build MovieBuddy: an AI-powered movie recommendation chatbot that use
 "Let me prove the data is actually in the database."
 
 *(Run in terminal)*
-```
+```bash
 kubectl exec -it $(kubectl get pod -l app=movie-buddy -o jsonpath='{.items[0].metadata.name}') \
   -- python3 -c "
 from pymongo import MongoClient
-import os
+import os, json
 c = MongoClient(os.environ['MONGO_URL'])
-import json
 docs = list(c.movie_buddy.profiles.find({}, {'_id': 0}))
 print(json.dumps(docs, indent=2, default=str))
 "
@@ -63,10 +88,16 @@ print(json.dumps(docs, indent=2, default=str))
 
 "You can see the profile data — genres, movies watched, kids ages — all persisted in MongoDB."
 
+**Slide content:** 3 bullet points: "Multi-agent AI system (Claude Sonnet)" | "EKS on AWS, HTTPS via ACM" | "MongoDB persistent memory" + app mockup image
+
+**ChatGPT image prompt:**
+Dark-themed chat UI mockup illustration. Split composition: left two-thirds shows a chat interface with dark background (#1e2433), a conversation about movie recommendations, movie poster thumbnails arranged in a row, and four colored specialist agent badges at the top (blue "Tracker", green "Explorer", orange "Fact-Checker", purple "Planner"). Right one-third shows a sidebar panel with user profile data — genre preferences, kids ages, streaming platforms listed. Electric blue and purple accent colors. Clean sans-serif typography feel. Flat design illustration, not a screenshot. 16:9 widescreen.
+
 ---
 
 ## Slide 5 — Business Benefits and Risks (3 min)
 
+**Speaker notes:**
 "Before we look at security in detail, let me frame the business context — because security findings only matter if you understand what they mean for the business.
 
 This environment has clear value: it's fully automated, reproducible, scalable. I can tear it down and redeploy the entire thing in about 30 minutes from a single Terraform command. That's real business agility.
@@ -79,12 +110,18 @@ The EC2 instance has AdministratorAccess IAM role attached. If an attacker compr
 
 The S3 bucket that holds database backups is publicly readable. And as we'll see shortly, it also contains something it shouldn't.
 
-And both MongoDB and the operating system are over a year out of date — meaning there are known, documented attack techniques for these versions available publicly."
+Both MongoDB and the operating system are over a year out of date — meaning there are known, documented attack techniques for these versions available publicly."
+
+**Slide content:** Two columns — Benefits | Risks (see image)
+
+**ChatGPT image prompt:**
+Two-panel infographic on dark navy background (#0a0e1a). Left panel labeled "Business Value" — three items each with a green checkmark circle icon: "Automated Deployment", "Horizontally Scalable", "Full Audit Trail". Right panel labeled "Security Risks" — four items each with a red warning triangle icon: "SSH Exposed to Internet", "Over-Privileged IAM Role", "Credentials in Public S3", "Unpatched CVEs". Vertical electric blue (#00B4D8) dividing line between panels. White text, flat icon style. No decorative elements. Clean enterprise look. 16:9 widescreen.
 
 ---
 
 ## Slide 6 — How You Built It — LIVE DEMO (5 min)
 
+**Speaker notes:**
 "I built this using a full DevSecOps pipeline. Let me show you how it works."
 
 *(Switch to GitHub — show repo structure briefly)*
@@ -108,10 +145,16 @@ kubectl get secrets
 kubectl get secret movie-buddy-secrets -o jsonpath='{.data}' | python3 -m json.tool
 ```
 
+**Slide content:** Pipeline flow diagram image
+
+**ChatGPT image prompt:**
+Horizontal pipeline flow diagram on dark navy background (#0a0e1a). Two parallel pipeline tracks stacked vertically, each with a label on the left. Top track labeled "Infra Pipeline": connected boxes left to right — "Git Push" → "Checkov Scan" (red security shield icon) → "Terraform Plan" (document icon) → "Manual Approval" (human/pause icon, amber color) → "Terraform Apply" → "AWS" (cloud icon). Bottom track labeled "App Pipeline": "Git Push" → "Trivy Scan" (red shield) → "Docker Build" → "ECR Push" → "kubectl rollout" → "EKS" (Kubernetes wheel icon). Electric blue (#00B4D8) arrows connecting boxes. Boxes in dark charcoal (#1e2433) with white text. Security scan steps have red accent border, deploy steps have green accent border. Flat vector style. 16:9 widescreen.
+
 ---
 
 ## Slide 7 — Challenges Faced (2 min)
 
+**Speaker notes:**
 "Building this wasn't without friction. Four real challenges worth mentioning:
 
 First — cross-platform Docker builds. My Mac runs on ARM64, EKS runs AMD64. The container would build fine locally and crash immediately on Kubernetes. Fixed with docker buildx and the --platform linux/amd64 flag.
@@ -122,10 +165,16 @@ Third — Streamlit uses WebSockets for its live UI updates. Behind an ALB witho
 
 Fourth — Terraform state. The CI/CD pipeline has no access to a state file on my laptop. I migrated state to S3, which makes it accessible to any pipeline runner and enables true infrastructure automation."
 
+**Slide content:** Four challenge cards (see image)
+
+**ChatGPT image prompt:**
+Four-card grid layout on dark navy background (#0a0e1a). Cards are dark charcoal (#1e2433) rounded rectangles arranged in a 2x2 grid. Each card has a small icon at top, a short bold title, and a 1-line description. Card 1: Docker whale icon — "ARM→AMD64" — "Cross-platform build with docker buildx". Card 2: Network/subnet icon — "ALB Subnet Discovery" — "Missing Kubernetes cluster tags on subnets". Card 3: Lightning/websocket icon — "WebSocket Stability" — "Sticky sessions required for Streamlit behind ALB". Card 4: Database/cloud icon — "Terraform Remote State" — "Migrated tfstate to S3 for CI/CD access". Each card has a small amber dot (challenge) in top-right and a green checkmark (resolved) in bottom-right. Electric blue border accent on each card. Flat icon style, white text, equal spacing. 16:9 widescreen.
+
 ---
 
 ## Slide 8 — Security Findings — LIVE DEMO (8 min)
 
+**Speaker notes:**
 "Now the most important part — what did the security tools actually find. I'll walk through each one live."
 
 *(Switch to GitHub Actions → Infra CI run → Checkov step)*
@@ -150,13 +199,19 @@ Fourth — Terraform state. The CI/CD pipeline has no access to a state file on 
 
 "So across five tools, I have findings. But here's the question — which one do I fix first? And do any of these findings connect to each other in a way that creates a bigger risk than each one individually?"
 
+**Slide content:** Security findings dashboard image
+
+**ChatGPT image prompt:**
+Security findings dashboard on dark navy background (#0a0e1a). Five tool labels as column headers in a row across the top: "Checkov", "Trivy", "AWS Inspector", "GuardDuty", "AWS Config / CloudTrail". Below each header, 2 finding cards in dark charcoal (#1e2433). Cards have colored left-border severity indicator: red = CRITICAL, orange = HIGH. Finding labels in white text: under Checkov — "SSH open 0.0.0.0/0", "AdministratorAccess IAM"; under Trivy — "Base image CVEs"; under Inspector — "MongoDB 4.4 CVEs", "Ubuntu 20.04 EOL"; under GuardDuty — "Runtime monitoring active"; under Config/CloudTrail — "Config drift detection", "Full API audit log". Bottom center: large badge "10 Findings Detected" in red. Flat design, no gradients. 16:9 widescreen.
+
 ---
 
 ## Slide 9 — What Value Would Wiz Provide — LIVE DEMO (5 min)
 
-"That question is exactly the right one — and none of the tools I just showed you can answer it. Let me show you why."
+**Speaker notes:**
+"That question is exactly the right one — and none of the tools I just showed you can answer it. Let me show you why.
 
-"To get a complete picture of this environment, I checked six different tools: Checkov, Trivy, Inspector, GuardDuty, Config, CloudTrail. Six interfaces, six finding formats, six places to look. And after all of that — I still don't have a prioritized answer to: what do I fix first, and why?"
+To get a complete picture of this environment, I checked six different tools: Checkov, Trivy, Inspector, GuardDuty, Config, CloudTrail. Six interfaces, six finding formats, six places to look. And after all of that — I still don't have a prioritized answer to: what do I fix first, and why?"
 
 "Let me show you something concrete."
 
@@ -173,18 +228,24 @@ aws s3 cp s3://movie-buddy-tfstate-329153220664/wiz-exercise/terraform.tfstate -
   | python3 -m json.tool | grep -A3 mongodb_url
 ```
 
-"The Terraform state file contains the MongoDB connection string — username and password — in plain text. And it's sitting in a publicly accessible bucket. Anyone who knows this bucket name can read this file and connect directly to the database. No credentials required at any step."
+"The Terraform state file contains the MongoDB connection string — username and password — in plain text. And it's sitting in a publicly accessible bucket. Anyone who knows this bucket name can read this file and connect directly to the database. No credentials required at any step.
 
-"That's a four-step attack path: public S3 bucket → readable state file → exposed credentials → full database access. Checkov flagged the public bucket as one finding. It flagged missing encryption as another. But no tool connected these dots and said: together, these create a complete path from the public internet to your customer data."
+That's a four-step attack path: public S3 bucket → readable state file → exposed credentials → full database access. Checkov flagged the public bucket as one finding. It flagged missing encryption as another. But no tool connected these dots and said: together, these create a complete path from the public internet to your customer data.
 
-"This is precisely what Wiz was built to solve. Wiz builds a graph of your entire cloud environment — every resource, every permission, every network path — and uses that graph to identify which combinations of findings create real attack paths. Instead of ten isolated findings, you get three prioritized attack paths ranked by actual exploitability and business impact. Your security team stops triaging alerts and starts fixing what actually matters."
+This is precisely what Wiz was built to solve. Wiz builds a graph of your entire cloud environment — every resource, every permission, every network path — and uses that graph to identify which combinations of findings create real attack paths. Instead of ten isolated findings, you get three prioritized attack paths ranked by actual exploitability and business impact. Your security team stops triaging alerts and starts fixing what actually matters.
 
-"In CI/CD pipelines, you can add tools like Semgrep for code scanning, KICS for additional IaC checks. Each adds signal — but also another pane of glass. Wiz sits above all of these and gives you the unified view with context to act."
+In CI/CD pipelines, you can add tools like Semgrep for code scanning, KICS for additional IaC checks. Each adds signal — but also another pane of glass. Wiz sits above all of these and gives you the unified view with context to act."
+
+**Slide content:** Fragmentation vs unified view image
+
+**ChatGPT image prompt:**
+Split composition on dark navy background (#0a0e1a). Left half labeled "Without Wiz" (muted, slightly gray tint): Six isolated tool icons scattered — Checkov, Trivy, Inspector, GuardDuty, Config, CloudTrail — each in its own separate dark box with no connections between them, red warning icons floating disconnected, chaotic arrangement suggesting fragmentation and alert fatigue. Right half labeled "With Wiz" (vivid, full color): A clean connected graph — five nodes labeled "Public Internet" → "Public S3 Bucket" → "Terraform State File" → "MongoDB Credentials" → "Database" — connected by a glowing red attack path arrow showing the full chain. Below the graph: "1 Critical Attack Path" in bold red. Vertical dividing line in electric blue (#00B4D8) between the two halves. Flat vector style. 16:9 widescreen.
 
 ---
 
 ## Slide 10 — What Would You Do Differently (2 min)
 
+**Speaker notes:**
 "If I were hardening this for production, four changes in priority order:
 
 First — AWS Secrets Manager with the External Secrets Operator. Remove credentials from Kubernetes Secrets and Terraform state entirely. Secrets live in AWS, rotated automatically, never stored in plain text anywhere.
@@ -195,15 +256,26 @@ Third — replace static AWS credentials in GitHub Secrets with OIDC federation.
 
 Fourth — move MongoDB to a private subnet, remove the public IP from EC2, add VPC endpoints. Database traffic never leaves the AWS network."
 
+**Slide content:** Four-step roadmap image
+
+**ChatGPT image prompt:**
+Four-step improvement roadmap on dark navy background (#0a0e1a). Horizontal timeline with four numbered circular nodes (1, 2, 3, 4) connected by a progress bar line. Color gradient from amber/orange on the left (current state) to bright green on the right (target state). Node 1 (amber): key/lock icon — "Secrets Manager + ESO" label below. Node 2: shield icon — "IMDSv2 + Immutable ECR". Node 3: chain/link icon — "OIDC Federation". Node 4 (green): network diagram icon — "Private Subnet + VPC Endpoints". Below each node, a small dark charcoal (#1e2433) card with 2-line description. Above the timeline: "Current State" label on far left, "Production Ready" on far right. Flat vector style, white text. 16:9 widescreen.
+
 ---
 
 ## Slide 11 — Resources + Close (1 min)
 
+**Speaker notes:**
 "Happy to share all of these links by email after the call."
 
 *(Close with)*
 
 "Thank you all — this was a genuinely enjoyable exercise to build. I'd love to hear your feedback: is there anything you'd have liked to see more of, or any area where you'd want me to go deeper? I'll send a follow-up with the GitHub repo link and resources."
+
+**Slide content:** Resource cards
+
+**ChatGPT image prompt:**
+Minimal clean composition on dark navy background (#0a0e1a). Grid of 5 resource cards in two rows. Each card: dark charcoal (#1e2433) rounded rectangle, subtle electric blue (#00B4D8) left-border accent, small logo placeholder circle on the left, two lines of white text (resource name + short description). Cards: "AWS EKS Documentation", "AWS Load Balancer Controller", "Terraform AWS Provider", "Checkov by Bridgecrew", "Wiz Blog — Attack Path Methodology". Clean sans-serif typography feel. No decorative elements. Professional, understated. 16:9 widescreen.
 
 ---
 
@@ -233,90 +305,18 @@ docs = list(c.movie_buddy.profiles.find({}, {'_id': 0}))
 print(json.dumps(docs, indent=2, default=str))
 "
 
-# Show MongoDB backup files
+# Show MongoDB backup files in S3
 aws s3 ls s3://movie-buddy-db-backups/
 
 # Show Terraform state with credentials (attack path demo)
 aws s3 cp s3://movie-buddy-tfstate-329153220664/wiz-exercise/terraform.tfstate - | python3 -m json.tool | grep -A3 mongodb_url
 
-# SSH to MongoDB server (show open SSH)
+# Show S3 bucket is publicly accessible (open in browser, no login)
+# https://movie-buddy-db-backups.s3.amazonaws.com/
+
+# SSH to MongoDB server (demonstrate open SSH)
 ssh -i wiz-exercise/wiz-exercise-key ubuntu@100.52.232.237
 
-# Check MongoDB version
+# Check MongoDB and OS version
 ssh -i wiz-exercise/wiz-exercise-key ubuntu@100.52.232.237 "mongod --version && lsb_release -a"
 ```
-
----
-
-## IMAGE PROMPTS FOR CHATGPT
-
-Visual style guidance for all images:
-- Dark navy background (#0a0e1a) for full-bleed slides (title, closing)
-- Dark charcoal (#1e2433) for content cards and boxes
-- Electric blue (#00B4D8) for arrows, accents, highlights
-- Red (#FF4444) for warnings, security findings, critical items
-- Green (#00C875) for resolved, positive, compliant items
-- White text on dark backgrounds
-- Flat vector illustration style — no 3D, no photo-realism, no gradients except subtle glows
-- Clean, modern, enterprise security aesthetic — inspired by Wiz.io visual language
-- All images 16:9 widescreen format, no text unless specified
-
----
-
-### Slide 1 — Title background
-
-Dark navy background (#0a0e1a). Centered composition. A stylized AWS cloud architecture diagram rendered as glowing neon lines on dark background — showing a Kubernetes cluster icon, a database cylinder, an S3 bucket, and a load balancer connected by flowing electric-blue (#00B4D8) lines. Flat vector illustration style, no gradients except subtle blue glow effects. No text. Modern enterprise security aesthetic inspired by Wiz.io. 16:9 widescreen format.
-
----
-
-### Slide 3 — Architecture diagram
-
-Clean AWS architecture diagram. Show left to right: Internet user icon → DNS/Route53 → Application Load Balancer (with padlock/SSL icon) → EKS cluster box (containing a Kubernetes pod icon labeled "MovieBuddy") → MongoDB cylinder on EC2 instance → S3 bucket for backups. Use AWS-style flat service icons. Color scheme: dark navy (#0a0e1a) background, electric blue (#00B4D8) for connection arrows, white labels. Add small red warning triangle icons on: EC2 (SSH open to internet), S3 (public bucket), IAM badge on EC2 (overpermissive), Kubernetes pod (cluster-admin). Flat 2D diagram, clean lines, no shadows. 16:9 widescreen.
-
----
-
-### Slide 4 — MovieBuddy app mockup
-
-Dark-themed chat UI mockup. Split composition: left two-thirds shows a chat interface with dark background (#1e2433), a conversation about movie recommendations, movie poster thumbnails arranged in a row, and four colored specialist agent badges at the top (blue "Tracker", green "Explorer", orange "Fact-Checker", purple "Planner"). Right one-third shows a sidebar panel with user profile data — genre preferences, kids ages, streaming platforms listed. Electric blue and purple accent colors. Clean sans-serif typography feel. Flat design illustration, not a real screenshot. 16:9 widescreen.
-
----
-
-### Slide 5 — Business benefits vs risks
-
-Two-panel infographic on dark navy background (#0a0e1a). Left panel labeled "Business Value" — three items each with a green checkmark circle icon: "Automated Deployment", "Horizontally Scalable", "Full Audit Trail". Right panel labeled "Security Risks" — four items each with a red warning triangle icon: "SSH Exposed to Internet", "Over-Privileged IAM Role", "Credentials in Public S3", "Unpatched CVEs". Vertical electric blue dividing line between panels. White text, flat icon style. No decorative elements. Clean enterprise look. 16:9 widescreen.
-
----
-
-### Slide 6 — DevSecOps pipeline diagram
-
-Horizontal pipeline flow diagram on dark navy background. Two parallel pipeline tracks stacked vertically with a label on the left of each. Top track labeled "Infra Pipeline": connected boxes left to right — "Git Push" → "Checkov Scan" (red security shield icon) → "Terraform Plan" (document icon) → "Manual Approval" (human/pause icon, amber color) → "Terraform Apply" → "AWS" (cloud icon). Bottom track labeled "App Pipeline": "Git Push" → "Trivy Scan" (red shield) → "Docker Build" → "ECR Push" → "kubectl rollout" → "EKS" (Kubernetes wheel icon). Electric blue (#00B4D8) arrows connecting boxes. Boxes in dark charcoal (#1e2433) with white text. Security scan steps have red accent, deploy steps have green accent. Flat vector style. 16:9 widescreen.
-
----
-
-### Slide 7 — Challenges faced
-
-Four-card grid layout on dark navy background. Cards are dark charcoal (#1e2433) rounded rectangles arranged in a 2x2 grid. Each card has: a small icon at top, a short bold title, and 1-line description. Card 1: Docker whale icon — "ARM→AMD64" — "Cross-platform build with docker buildx". Card 2: Network/subnet icon — "ALB Subnet Discovery" — "Missing Kubernetes cluster tags on subnets". Card 3: Lightning/websocket icon — "WebSocket Stability" — "Sticky sessions required for Streamlit behind ALB". Card 4: Database/cloud icon — "Terraform Remote State" — "Migrated tfstate to S3 for CI/CD access". Each card has a small amber "challenge" dot in top-right corner and a green checkmark "resolved" badge in bottom-right. Electric blue border accent on each card. Flat icon style, white text, equal spacing. 16:9 widescreen.
-
----
-
-### Slide 8 — Security findings dashboard
-
-Security findings dashboard aesthetic on dark navy background. Five tool labels across the top row as column headers: "Checkov", "Trivy", "AWS Inspector", "GuardDuty", "AWS Config / CloudTrail". Below each header, 2 finding cards in dark charcoal (#1e2433). Cards have colored left-border severity indicator: red = CRITICAL, orange = HIGH. Sample finding labels (white text, small): under Checkov — "SSH open 0.0.0.0/0", "AdministratorAccess IAM"; under Inspector — "MongoDB 4.4 CVEs", "Ubuntu 20.04 EOL"; under GuardDuty — "Runtime monitoring active"; under Config/CloudTrail — "Config drift detection", "Full API audit log". Bottom of composition: large counter badge "10 Findings Detected" in red. Flat design, no gradients. 16:9 widescreen.
-
----
-
-### Slide 9 — Wiz value / attack path
-
-Split composition on dark navy background. Left half labeled "Without Wiz" (slightly muted/gray): Six isolated tool icons scattered — Checkov, Trivy, Inspector, GuardDuty, Config, CloudTrail — each in its own separate box with no connections between them, red warning icons floating disconnected, chaotic arrangement suggesting fragmentation and alert fatigue. Right half labeled "With Wiz" (vivid, electric blue accents): A clean connected graph — nodes labeled "Public Internet" → "Public S3 Bucket" → "Terraform State File" → "MongoDB Credentials" → "Database" — connected by a glowing red attack path arrow showing the full chain. Below the graph: "1 Critical Attack Path" in bold red. Vertical dividing line in electric blue between the two halves. Flat vector style. 16:9 widescreen.
-
----
-
-### Slide 10 — What would you do differently (roadmap)
-
-Four-step improvement roadmap on dark navy background. Horizontal timeline with four numbered circular nodes (1, 2, 3, 4) connected by a progress bar line. Color gradient from amber/orange on the left (current state) to bright green on the right (target state). Node 1 (amber): key/lock icon — "Secrets Manager + ESO" below. Node 2: shield icon — "IMDSv2 + Immutable ECR". Node 3: chain/link icon — "OIDC Federation". Node 4 (green): network diagram icon — "Private Subnet + VPC Endpoints". Below each node, a small dark charcoal card with 2-line description. Above the timeline: small label "Current State" on left, "Production Ready" on right. Flat vector style, white text. 16:9 widescreen.
-
----
-
-### Slide 11 — Resources (minimal)
-
-Minimal clean composition on dark navy background. Simple grid of 5 resource cards arranged in two rows. Each card: dark charcoal (#1e2433) rounded rectangle, subtle electric blue left-border accent, a small logo placeholder circle on the left, and two lines of white text (resource name + short description). Cards: "AWS EKS Documentation", "AWS Load Balancer Controller", "Terraform AWS Provider", "Checkov by Bridgecrew", "Wiz Blog — Attack Path Methodology". Clean sans-serif typography feel. No decorative elements. Understated, professional. 16:9 widescreen.
