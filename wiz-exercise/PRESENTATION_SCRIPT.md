@@ -39,25 +39,64 @@ Dark navy background (#0a0e1a). Centered composition. A stylized AWS cloud archi
 
 ---
 
-## Slide 3 — Overview / Architecture (3 min)
+## Slide 2 — Agenda (1 min)
 
 **Speaker notes:**
-"The exercise asked me to deploy a real, working cloud application — deliberately configured with security weaknesses that you'd realistically find in enterprise environments built under delivery pressure.
+"Here's what we'll cover in the next 30 minutes. I'll start with the task I was given, then walk you through the solution I built and a live demo of the running application. From there we'll look at the DevSecOps pipeline, the security findings from the AWS native tools, and how Wiz would provide value in this environment. I'll close with what I'd do differently and what I took away from this exercise. We'll have 15 minutes for questions at the end — but feel free to interrupt at any point if something sparks a question."
 
-I chose to build MovieBuddy: an AI-powered movie recommendation chatbot that uses Claude and real-time web search. It's a multi-agent system — not a toy app. Here's the architecture."
+**Slide content:** Numbered agenda list:
+1. The Task
+2. The Solution — Architecture & Live Demo
+3. How I Built It — DevSecOps Pipeline
+4. Security Findings
+5. The Value of Wiz
+6. What I'd Do Differently & What I Learned
+7. Q&A
 
-*(Point to architecture diagram on slide)*
+**ChatGPT image prompt:**
+Minimal vertical agenda layout on dark navy background (#0a0e1a). Seven numbered items in a clean vertical list, each on its own row. Numbers in large electric blue (#00B4D8) circles on the left, item text in white on the right. Items: "1 The Task", "2 The Solution & Live Demo", "3 DevSecOps Pipeline", "4 Security Findings", "5 The Value of Wiz", "6 What I'd Do Differently & Learned", "7 Q&A". Row 7 slightly muted/lighter to indicate it's after the main presentation. Clean sans-serif typography, generous spacing between rows. No decorative elements. 16:9 widescreen.
 
-"The application runs in a containerized Kubernetes cluster on EKS — in private subnets. Traffic comes in through an AWS Application Load Balancer with HTTPS termination via ACM certificates. The database is MongoDB running on EC2 — and I've built in several intentional security weaknesses that we'll get to shortly. The whole infrastructure is defined as code in Terraform and deployed via GitHub Actions CI/CD pipelines."
+---
 
-**Slide content:** One-liner description + architecture diagram image
+## Slide 3 — The Task (2 min)
+
+**Speaker notes:**
+"Let me start with what I was actually asked to do — because the task itself is interesting and explains every architectural decision you'll see.
+
+The assignment was to deploy a two-tier cloud application — a containerized web app backed by a MongoDB database — using modern DevOps practices. But with a twist: several components had to be deliberately misconfigured. The database server had to run an outdated version of MongoDB on an outdated Linux OS, with SSH exposed to the internet and an overly permissive cloud role. The storage bucket for database backups had to be publicly readable.
+
+The containerized application had to be assigned a Kubernetes cluster-admin role — which in practice means the running container has full control over the entire Kubernetes cluster.
+
+On top of that, I had to build a full CI/CD pipeline with security scanning at each stage, and implement AWS-native security controls to detect the misconfigurations.
+
+The goal of all of this is to simulate the kind of environment that security teams encounter in the real world — where applications are built under delivery pressure, security is treated as an afterthought, and the attack surface is much larger than anyone realizes. And then to demonstrate how you'd find and communicate those risks."
+
+**Slide content:** Task summary with key requirements highlighted
+
+**ChatGPT image prompt:**
+Split two-column layout on dark navy background (#0a0e1a). Left column header: "The Requirements" — bulleted list items in white with small electric blue bullet dots: "Containerized app on Kubernetes", "MongoDB on EC2 (outdated)", "CI/CD pipeline with security scanning", "AWS-native security controls". Right column header: "Intentional Weaknesses" — same list style but bullet dots are red warning triangles: "SSH open to internet", "Overly permissive IAM role", "Public S3 bucket", "Cluster-admin pod role", "Outdated OS + DB versions". Both columns in dark charcoal (#1e2433) rounded card. Thin electric blue border on left column, thin red border on right column. White text throughout. Clean, minimal. 16:9 widescreen.
+
+---
+
+## Slide 4 — The Solution — Architecture (2 min)
+
+**Speaker notes:**
+"Here's what I built. The application is called MovieBuddy — an AI-powered movie recommendation chatbot. I chose it because it's a genuinely useful multi-agent system rather than a toy app, which makes the demo more meaningful. It uses Claude Sonnet as the AI backbone, Tavily for live web search, and TMDB for movie posters.
+
+Architecturally: traffic comes in through an AWS Application Load Balancer with HTTPS termination via ACM certificates. The load balancer routes to a Kubernetes pod running on EKS — in private subnets. The pod connects to MongoDB on an EC2 instance for persistent user memory. Database backups run daily to S3.
+
+The red warning icons you can see on the diagram are the intentional weaknesses — we'll come back to each of them when we look at the security findings."
+
+*(Point to each component on the diagram as you describe it)*
+
+**Slide content:** Architecture diagram image
 
 **ChatGPT image prompt:**
 Clean AWS architecture diagram on dark navy background (#0a0e1a). Show left to right: Internet user icon → DNS/Route53 → Application Load Balancer (with padlock/SSL icon) → EKS cluster box (containing a Kubernetes pod icon labeled "MovieBuddy") → MongoDB cylinder on EC2 instance → S3 bucket for backups. Use AWS-style flat service icons. Electric blue (#00B4D8) connection arrows, white labels. Add small red warning triangle icons on: EC2 (SSH open to internet), S3 (public bucket), IAM badge on EC2 (overpermissive), Kubernetes pod (cluster-admin). Flat 2D diagram, clean lines, no shadows. 16:9 widescreen.
 
 ---
 
-## Slide 4 — What You Built — LIVE DEMO (5 min)
+## Slide 5 — Live Demo — The Application (5 min)
 
 **Speaker notes:**
 "Let me show you the application live."
@@ -88,14 +127,14 @@ print(json.dumps(docs, indent=2, default=str))
 
 "You can see the profile data — genres, movies watched, kids ages — all persisted in MongoDB."
 
-**Slide content:** 3 bullet points: "Multi-agent AI system (Claude Sonnet)" | "EKS on AWS, HTTPS via ACM" | "MongoDB persistent memory" + app mockup image
+**Slide content:** App mockup image + 3 bullet points: "Multi-agent AI (Claude Sonnet)" | "EKS on AWS, HTTPS" | "MongoDB persistent memory"
 
 **ChatGPT image prompt:**
 Dark-themed chat UI mockup illustration. Split composition: left two-thirds shows a chat interface with dark background (#1e2433), a conversation about movie recommendations, movie poster thumbnails arranged in a row, and four colored specialist agent badges at the top (blue "Tracker", green "Explorer", orange "Fact-Checker", purple "Planner"). Right one-third shows a sidebar panel with user profile data — genre preferences, kids ages, streaming platforms listed. Electric blue and purple accent colors. Clean sans-serif typography feel. Flat design illustration, not a screenshot. 16:9 widescreen.
 
 ---
 
-## Slide 5 — Business Benefits and Risks (3 min)
+## Slide 6 — Business Benefits and Risks (3 min)
 
 **Speaker notes:**
 "Before we look at security in detail, let me frame the business context — because security findings only matter if you understand what they mean for the business.
@@ -112,14 +151,14 @@ The S3 bucket that holds database backups is publicly readable. And as we'll see
 
 Both MongoDB and the operating system are over a year out of date — meaning there are known, documented attack techniques for these versions available publicly."
 
-**Slide content:** Two columns — Benefits | Risks (see image)
+**Slide content:** Two columns — Benefits | Risks
 
 **ChatGPT image prompt:**
 Two-panel infographic on dark navy background (#0a0e1a). Left panel labeled "Business Value" — three items each with a green checkmark circle icon: "Automated Deployment", "Horizontally Scalable", "Full Audit Trail". Right panel labeled "Security Risks" — four items each with a red warning triangle icon: "SSH Exposed to Internet", "Over-Privileged IAM Role", "Credentials in Public S3", "Unpatched CVEs". Vertical electric blue (#00B4D8) dividing line between panels. White text, flat icon style. No decorative elements. Clean enterprise look. 16:9 widescreen.
 
 ---
 
-## Slide 6 — How You Built It — LIVE DEMO (5 min)
+## Slide 7 — How I Built It — DevSecOps Pipeline — LIVE DEMO (5 min)
 
 **Speaker notes:**
 "I built this using a full DevSecOps pipeline. Let me show you how it works."
@@ -149,26 +188,6 @@ kubectl get secret movie-buddy-secrets -o jsonpath='{.data}' | python3 -m json.t
 
 **ChatGPT image prompt:**
 Horizontal pipeline flow diagram on dark navy background (#0a0e1a). Two parallel pipeline tracks stacked vertically, each with a label on the left. Top track labeled "Infra Pipeline": connected boxes left to right — "Git Push" → "Checkov Scan" (red security shield icon) → "Terraform Plan" (document icon) → "Manual Approval" (human/pause icon, amber color) → "Terraform Apply" → "AWS" (cloud icon). Bottom track labeled "App Pipeline": "Git Push" → "Trivy Scan" (red shield) → "Docker Build" → "ECR Push" → "kubectl rollout" → "EKS" (Kubernetes wheel icon). Electric blue (#00B4D8) arrows connecting boxes. Boxes in dark charcoal (#1e2433) with white text. Security scan steps have red accent border, deploy steps have green accent border. Flat vector style. 16:9 widescreen.
-
----
-
-## Slide 7 — Challenges Faced (2 min)
-
-**Speaker notes:**
-"Building this wasn't without friction. Four real challenges worth mentioning:
-
-First — cross-platform Docker builds. My Mac runs on ARM64, EKS runs AMD64. The container would build fine locally and crash immediately on Kubernetes. Fixed with docker buildx and the --platform linux/amd64 flag.
-
-Second — the AWS Load Balancer Controller couldn't discover my subnets automatically because they were missing required Kubernetes cluster tags. I had to add those tags via Terraform and explicitly pin the subnet IDs in the ingress configuration.
-
-Third — Streamlit uses WebSockets for its live UI updates. Behind an ALB without sticky sessions, every page refresh would land on a different connection and the app would fail to load. Fixed by adding sticky session annotations to the Kubernetes ingress.
-
-Fourth — Terraform state. The CI/CD pipeline has no access to a state file on my laptop. I migrated state to S3, which makes it accessible to any pipeline runner and enables true infrastructure automation."
-
-**Slide content:** Four challenge cards (see image)
-
-**ChatGPT image prompt:**
-Four-card grid layout on dark navy background (#0a0e1a). Cards are dark charcoal (#1e2433) rounded rectangles arranged in a 2x2 grid. Each card has a small icon at top, a short bold title, and a 1-line description. Card 1: Docker whale icon — "ARM→AMD64" — "Cross-platform build with docker buildx". Card 2: Network/subnet icon — "ALB Subnet Discovery" — "Missing Kubernetes cluster tags on subnets". Card 3: Lightning/websocket icon — "WebSocket Stability" — "Sticky sessions required for Streamlit behind ALB". Card 4: Database/cloud icon — "Terraform Remote State" — "Migrated tfstate to S3 for CI/CD access". Each card has a small amber dot (challenge) in top-right and a green checkmark (resolved) in bottom-right. Electric blue border accent on each card. Flat icon style, white text, equal spacing. 16:9 widescreen.
 
 ---
 
@@ -243,7 +262,31 @@ Split composition on dark navy background (#0a0e1a). Left half labeled "Without 
 
 ---
 
-## Slide 10 — What Would You Do Differently (2 min)
+## Slide 10 — Challenges & What I Learned (3 min)
+
+**Speaker notes:**
+"Building this wasn't without friction — and the friction is where the real learning happened. Let me walk through both.
+
+Four technical challenges I hit:
+
+First — cross-platform Docker builds. My Mac runs ARM64, EKS runs AMD64. The container built fine locally and crashed immediately on Kubernetes. Fixed with docker buildx and the --platform linux/amd64 flag. This taught me that container portability isn't automatic — you have to be explicit about target architecture.
+
+Second — the AWS Load Balancer Controller couldn't discover my subnets because they were missing required Kubernetes cluster tags. I had to add those tags via Terraform and explicitly pin subnet IDs in the ingress. This taught me that the ALB controller has very specific expectations about subnet tagging, and when those aren't met, the error messages are not obvious.
+
+Third — Streamlit uses WebSockets for its live UI. Behind an ALB without sticky sessions, every page refresh broke the connection. Fixed with sticky session annotations on the ingress. This taught me that not all HTTP traffic behaves the same — WebSocket applications have specific load balancer requirements.
+
+Fourth — Terraform state. The CI/CD pipeline had no access to state on my laptop. Migrating to S3 made the pipeline work — but also revealed a security issue: the state file contains credentials in plain text, and I'd put it in a public bucket. That mistake became the strongest demo moment in the presentation.
+
+What I took away from the exercise overall: the most interesting security findings in this environment weren't the obvious ones — open SSH, outdated software. The most dangerous finding emerged from the combination of two seemingly unrelated decisions: a public S3 bucket and Terraform remote state. Neither decision is alarming on its own. Together they create a complete attack path. That's the insight that made the Wiz value proposition click for me — it's not about finding more things, it's about connecting the things you already know."
+
+**Slide content:** Four challenge cards + key learning callout
+
+**ChatGPT image prompt:**
+Two-section layout on dark navy background (#0a0e1a). Top section: four-card horizontal row — cards in dark charcoal (#1e2433) rounded rectangles. Card 1: Docker whale icon — "ARM→AMD64 Builds". Card 2: network icon — "ALB Subnet Tags". Card 3: lightning icon — "WebSocket + Sticky Sessions". Card 4: database/cloud icon — "Terraform Remote State". Each card has a small amber dot top-right (challenge) and green checkmark bottom-right (resolved). Electric blue border on each card. Bottom section: single wide callout card with electric blue left border and slightly lighter background. Bold white text: "Key Insight" label, then smaller text: "The most dangerous finding came from combining two unrelated decisions — not from any single misconfiguration." Flat vector style, white text. 16:9 widescreen.
+
+---
+
+## Slide 11 — What Would You Do Differently (2 min)
 
 **Speaker notes:**
 "If I were hardening this for production, four changes in priority order:
@@ -263,19 +306,20 @@ Four-step improvement roadmap on dark navy background (#0a0e1a). Horizontal time
 
 ---
 
-## Slide 11 — Resources + Close (1 min)
+## Slide 12 — Close / Q&A (1 min)
 
 **Speaker notes:**
-"Happy to share all of these links by email after the call."
+"That brings me to the end of the presentation. To summarise: I built a real, working cloud-native application, deliberately introduced the security weaknesses the exercise required, built a DevSecOps pipeline that surfaces those weaknesses automatically, and implemented AWS-native controls for detection and audit. And I showed you how the fragmentation of findings across those tools is exactly the problem Wiz was built to solve.
 
-*(Close with)*
+I'd love to open it up for questions — and I'd genuinely appreciate your feedback. Is there anything you'd like me to go deeper on, or anything you'd have done differently?"
 
-"Thank you all — this was a genuinely enjoyable exercise to build. I'd love to hear your feedback: is there anything you'd have liked to see more of, or any area where you'd want me to go deeper? I'll send a follow-up with the GitHub repo link and resources."
+*(After Q&A, close with:)*
+"Thank you all for your time. I'll follow up by email with the GitHub repository link. Looking forward to the next steps."
 
-**Slide content:** Resource cards
+**Slide content:** "Thank you" + GitHub repo URL + contact email
 
 **ChatGPT image prompt:**
-Minimal clean composition on dark navy background (#0a0e1a). Grid of 5 resource cards in two rows. Each card: dark charcoal (#1e2433) rounded rectangle, subtle electric blue (#00B4D8) left-border accent, small logo placeholder circle on the left, two lines of white text (resource name + short description). Cards: "AWS EKS Documentation", "AWS Load Balancer Controller", "Terraform AWS Provider", "Checkov by Bridgecrew", "Wiz Blog — Attack Path Methodology". Clean sans-serif typography feel. No decorative elements. Professional, understated. 16:9 widescreen.
+Minimal closing slide on dark navy background (#0a0e1a). Center-aligned composition. Large white text "Thank You" at top. Below, two lines in electric blue (#00B4D8): a GitHub icon with "github.com/oleksii-androsov/ai-learning" and an envelope icon with "oleksiiandrosov85@gmail.com". Below those, in smaller white text: "Questions & Discussion". Subtle glowing electric blue horizontal line separating "Thank You" from the contact details. Clean, understated, professional. No other decorative elements. 16:9 widescreen.
 
 ---
 
