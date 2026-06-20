@@ -111,5 +111,10 @@ Severity: **High**
 
 ## Timing note
 
-Run this simulation **at least 1 hour before the presentation** to ensure
+Run this simulation **at least 2 hours before the presentation** to ensure
 the finding has appeared in GuardDuty before you go live.
+
+Note: tested on 2026-06-20 — finding did not appear after ~1 hour in a
+CloudLabs sandbox account. GuardDuty may have reduced detection coverage
+in sandbox/lab accounts. Try again closer to presentation day; if it still
+doesn't fire, the existing S3-related findings are sufficient for the demo.

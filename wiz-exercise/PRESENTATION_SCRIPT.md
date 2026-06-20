@@ -176,9 +176,15 @@ Dark-themed chat UI mockup illustration. Split composition: left two-thirds show
 
 *(Click into the Infra CI run — show Checkov findings, show the approval gate)*
 
-"The application pipeline triggers on code changes. It first builds the Docker image locally on the runner — not yet in ECR — then Trivy scans that built image for vulnerabilities before it goes anywhere. Only after the scan completes does the image get pushed to ECR, and kubectl rolls out the new version automatically. The findings are always visible here in the GitHub UI, even if the pipeline continues."
+"The application pipeline triggers on code changes. It first builds the Docker image locally on the runner — not yet in ECR — then Trivy scans that built image for vulnerabilities before it goes anywhere. Only after the scan completes does the image get pushed to ECR, and kubectl rolls out the new version automatically. The findings are always visible here in the GitHub UI."
 
-*(Click into App CI/CD run — show the Trivy scan step output with findings)*
+*(Click into App CI/CD run → Build, scan, push, deploy job → Trivy step)*
+
+"Trivy found 14 vulnerabilities in the built image — two critical CVEs in perl, high-severity findings in ncurses, SQLite, jaraco.context and others. These are real vulnerabilities in packages inside the running container. And because we output in SARIF format, GitHub renders them natively."
+
+*(Switch to GitHub repo → Security → Code scanning)*
+
+"14 open findings, severity-tagged, with full CVE descriptions — directly in GitHub where developers already work. The pipeline continues and deploys anyway because exit-code is set to 0 — in production you'd flip that to 1 and the push would be blocked automatically until findings are resolved."
 
 "There's one more piece of infrastructure I want to call out — Terraform remote state. When Terraform runs locally on my laptop, it keeps a state file on disk: a record of every resource it has created, with all their IDs, addresses, and configuration values. That's how it knows what already exists in AWS versus what needs to be created or changed.
 
@@ -287,24 +293,30 @@ Inspector also scanned the container images in ECR."
 
 "The running container image has a critical CVE in perl, plus multiple high-severity findings. These are vulnerabilities in packages inside the container — the application that's serving traffic right now at movie-buddy.app. Inspector gives me severity scores and CVE links, but it doesn't tell me whether these vulnerabilities are actually reachable from outside, or which one an attacker would use first. That context is missing."
 
-*(Switch to AWS Console → GuardDuty)*
+*(Switch to AWS Console → GuardDuty → Findings)*
 
-"GuardDuty is runtime threat detection. It monitors CloudTrail API logs, VPC flow logs, and DNS queries, looking for patterns that indicate malicious behavior — unusual API calls, connections to known malicious IPs, credential abuse. It's detective rather than preventative — it doesn't stop an attack, but tells you one is happening. In a mature environment you'd pipe these findings into a SIEM and trigger automated response."
+"GuardDuty is runtime behavioral detection. It monitors CloudTrail API logs, VPC flow logs, and DNS queries, looking for patterns that indicate malicious activity — not misconfigurations, but actual behavior. It found two findings here. The high-severity one: public anonymous access was granted to the S3 bucket. The low-severity one: S3 Block Public Access was disabled. GuardDuty detected these as suspicious actions — someone actively changed the bucket to be public — and flagged them independently of Checkov and Config, which found the same bucket through completely different mechanisms.
+
+That's three separate tools flagging the same S3 bucket, each with a different signal: Checkov saw it in the code before deployment, Config evaluated the live resource against a compliance rule, and GuardDuty detected the behavioral action of making it public. None of them are talking to each other.
+
+GuardDuty is detective rather than preventative — it doesn't stop an attack, but tells you one may be happening. In a mature environment you'd pipe these findings into a SIEM and trigger automated response."
 
 *(Switch to AWS Console → CloudTrail)*
 
 "CloudTrail gives me a complete audit log of every API call in this account — who did what, when, from which IP. Every Terraform apply, every kubectl command, every ECR push. This is your forensic trail. If something goes wrong, this is where the investigation starts."
 
-*(Switch to AWS Console → Config)*
+*(Switch to AWS Console → Config → Rules)*
 
-"AWS Config tracks configuration state over time. If someone manually changes a security group — bypassing the pipeline — Config records the change, who made it, and what it looked like before. This is how you detect configuration drift between what your IaC defines and what's actually running."
+"AWS Config evaluates your resources against compliance rules continuously. I defined two rules in Terraform — deployed through the same pipeline you just saw. The first rule: SSH must not be open to the internet. It immediately flagged the EC2 security group as non-compliant. The second rule: S3 buckets must not allow public read access — flagging the tfstate bucket. These are the same two weaknesses we already saw in Checkov, now detected at the infrastructure level by a different tool, independently.
+
+Config also tracks configuration state over time — if someone manually changes a security group bypassing the pipeline, Config records the change, who made it, and what it looked like before. That's your drift detection and forensic trail."
 
 "So across five tools, I have findings. But here's the question — which one do I fix first? And do any of these findings connect to each other in a way that creates a bigger risk than each one individually?"
 
 **Slide content:** Security findings dashboard image
 
 **ChatGPT image prompt:**
-Security findings dashboard on dark navy background (#0a0e1a). Five tool labels as column headers in a row across the top: "Checkov", "Trivy", "AWS Inspector", "GuardDuty", "AWS Config / CloudTrail". Below each header, 2 finding cards in dark charcoal (#1e2433). Cards have colored left-border severity indicator: red = CRITICAL, orange = HIGH. Finding labels in white text: under Checkov — "SSH open 0.0.0.0/0", "AdministratorAccess IAM"; under Trivy — "Base image CVEs"; under Inspector — "MongoDB 4.4 CVEs", "Ubuntu 20.04 EOL"; under GuardDuty — "Runtime monitoring active"; under Config/CloudTrail — "Config drift detection", "Full API audit log". Bottom center: large badge "10 Findings Detected" in red. Flat design, no gradients. 16:9 widescreen.
+Security findings dashboard on dark navy background (#0a0e1a). Five tool labels as column headers in a row across the top: "Checkov", "Trivy", "AWS Inspector", "GuardDuty", "AWS Config / CloudTrail". Below each header, 2 finding cards in dark charcoal (#1e2433). Cards have colored left-border severity indicator: red = CRITICAL, orange = HIGH. Finding labels in white text: under Checkov — "SSH open 0.0.0.0/0", "AdministratorAccess IAM"; under Trivy — "perl: Critical CVE", "jaraco.context: High CVE"; under Inspector — "26 Critical CVEs (EC2)", "libssh Critical CVE"; under GuardDuty — "Runtime monitoring active"; under Config/CloudTrail — "Config drift detection", "Full API audit log". Bottom center: large badge "40+ Findings Detected" in red. Flat design, no gradients. 16:9 widescreen.
 
 ---
 
