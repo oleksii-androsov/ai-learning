@@ -92,7 +92,26 @@ The red warning icons you can see on the diagram are the intentional weaknesses 
 **Slide content:** Architecture diagram image
 
 **ChatGPT image prompt:**
-Clean AWS architecture diagram on dark navy background (#0a0e1a). Show left to right: Internet user icon → DNS/Route53 → Application Load Balancer (with padlock/SSL icon) → EKS cluster box (containing a Kubernetes pod icon labeled "MovieBuddy") → MongoDB cylinder on EC2 instance → S3 bucket for backups. Use AWS-style flat service icons. Electric blue (#00B4D8) connection arrows, white labels. Add small red warning triangle icons on: EC2 (SSH open to internet), S3 (public bucket), IAM badge on EC2 (overpermissive), Kubernetes pod (cluster-admin). Flat 2D diagram, clean lines, no shadows. 16:9 widescreen.
+AWS architecture diagram on dark navy background (#0a0e1a). Dark style matching Wiz.io aesthetic. Layout left to right.
+
+Outside AWS (far left): Internet User icon → Namecheap DNS icon → these connect via electric blue arrow into the AWS boundary.
+
+Inside a large outer box labeled "AWS Cloud" (with the official orange AWS logo top-left of the box): everything below is inside this box.
+
+Inside AWS Cloud, a large green-bordered box labeled "VPC". Inside the VPC:
+- Left section: Application Load Balancer icon with padlock (HTTPS/ACM label). This is inside the VPC.
+- Center section: a box labeled "Amazon EKS Cluster" (Kubernetes wheel icon, blue border). Inside it, two dashed boxes side by side labeled "Private Subnet" each with a lock icon. Inside the left private subnet: a Kubernetes pod icon labeled "MovieBuddy (Kubernetes Pod)" with a red warning label below: "⚠ cluster-admin privileges".
+- Right section inside VPC: a dashed orange-bordered box labeled "Public Subnet". Inside it: EC2 instance icon labeled "EC2 Instance" with MongoDB leaf icon below labeled "MongoDB". Two red warning labels: "⚠ SSH open to Internet" and "⚠ Overpermissive IAM Role".
+
+Still inside AWS Cloud but outside the VPC box: Amazon S3 bucket icon labeled "Amazon S3 — Backups" with red warning label "⚠ Public bucket".
+
+Traffic flow arrows in electric blue (#00B4D8): Internet User → DNS → ALB → MovieBuddy Pod → EC2/MongoDB → S3.
+
+Bottom of slide: two small info boxes — "Infrastructure as Code / Terraform" (purple Terraform icon) and "CI/CD / GitHub Actions" (green Actions icon).
+
+Bottom-right legend box: blue arrow = Traffic Flow, red triangle = Security Weakness, green lock = Encrypted/Secure.
+
+Flat vector style, no gradients, no 3D. White text labels throughout. 16:9 widescreen.
 
 ---
 
