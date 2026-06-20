@@ -352,10 +352,10 @@ Third — OIDC federation instead of static AWS credentials in GitHub Secrets. R
 *(If asked about OIDC)*
 *"GitHub and AWS trust each other via OpenID Connect. GitHub says 'I am this repo, running this workflow' and AWS issues a temporary credential scoped to a specific IAM role. No key to store, no key to rotate, no key to leak."*
 
-Fourth — move MongoDB to a private subnet with no public IP, and add VPC endpoints. Currently the EC2 instance sits in a public subnet with a routable IP address — that's what made SSH from the internet possible. A private subnet has no internet gateway route. The machine can't be reached from outside AWS at all, even with port 22 open. VPC endpoints then allow the EC2 to reach AWS services like S3 for backups without that traffic ever leaving the AWS network.
+Fourth — move MongoDB to a private subnet with no public IP, and add a VPC endpoint for S3. Currently the EC2 is in a public subnet with a routable IP — that's what made SSH from the internet possible. Moving to a private subnet removes the public IP entirely. The machine can't be reached from outside AWS at all, even with port 22 open. But that creates a new problem: the daily backup script uses the AWS CLI to copy backups to S3, and a private subnet has no internet gateway route — so that call would break. A VPC S3 endpoint solves this by creating a private route directly from the VPC to S3, without traffic ever leaving the AWS network.
 
 *(If asked about VPC endpoints)*
-*"Without VPC endpoints, traffic from a private subnet to S3 travels out through a NAT gateway to the public internet and back. A VPC endpoint creates a private route directly to the AWS service — faster, cheaper, and the traffic never touches the internet."*"
+*"Our pod-to-MongoDB communication already stays inside the VPC via private IPs — that's working correctly. The VPC endpoint is specifically for EC2-to-S3 traffic. Without it, the backup script would have to go out through the internet to reach S3. The endpoint keeps that traffic private and is a prerequisite for the private subnet move to work end-to-end."*"
 
 **Slide content:** Four-step roadmap image
 

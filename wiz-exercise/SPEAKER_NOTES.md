@@ -211,10 +211,10 @@ Third — OIDC federation instead of static AWS credentials in GitHub Secrets. G
 [IF ASKED about OIDC]
 GitHub and AWS trust each other via OpenID Connect. GitHub says "I am this repo, running this workflow" — AWS issues a temporary credential scoped to one IAM role. Expires in minutes.
 
-Fourth — MongoDB to a private subnet, no public IP, VPC endpoints. Private subnet means no internet gateway route — the machine can't be reached from outside AWS even with port 22 open. VPC endpoints let the EC2 reach S3 for backups without traffic leaving the AWS network.
+Fourth — move MongoDB to a private subnet with no public IP, and add a VPC S3 endpoint. Moving to a private subnet removes the public IP entirely — the machine can't be reached from outside AWS at all, even with port 22 open. But the daily backup script uses the AWS CLI to copy backups to S3, and a private subnet has no internet gateway route — that call would break. A VPC S3 endpoint solves this by creating a private route directly from the VPC to S3, without traffic ever leaving the AWS network.
 
 [IF ASKED about VPC endpoints]
-Without them, traffic from a private subnet to S3 goes through a NAT gateway out to the internet and back. A VPC endpoint creates a direct private route — faster, cheaper, never touches the internet.
+Our pod-to-MongoDB traffic already stays inside the VPC via private IPs — that's working correctly. The VPC endpoint is specifically for EC2-to-S3 traffic. Without it, the backup script would go out through the internet to reach S3. The endpoint keeps that private and is a prerequisite for the private subnet move to work end-to-end.
 
 ---
 
