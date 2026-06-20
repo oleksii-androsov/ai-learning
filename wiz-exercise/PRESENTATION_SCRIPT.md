@@ -42,19 +42,19 @@ Dark navy background (#0a0e1a). Centered composition. A stylized AWS cloud archi
 ## Slide 2 — Agenda (1 min)
 
 **Speaker notes:**
-"Here's what we'll cover in the next 30 minutes. I'll start with the task I was given, then walk you through the solution I built and a live demo of the running application. From there we'll look at the DevSecOps pipeline, the security findings from the AWS native tools, and how Wiz would provide value in this environment. I'll close with what I'd do differently and what I took away from this exercise. We'll have 15 minutes for questions at the end — but feel free to interrupt at any point if something sparks a question."
+"Here's the plan for the next 30 minutes. The task I was given, then the architecture and a live demo. From there the DevSecOps pipeline, the security findings, and how Wiz would change the picture. I'll close with what I'd do differently and what I learned. Questions at the end — but feel free to interrupt."
 
 **Slide content:** Numbered agenda list:
 1. The Task
-2. The Solution — Architecture & Live Demo
-3. How I Built It — DevSecOps Pipeline
-4. Security Findings
-5. The Value of Wiz
+2. Architecture
+3. Live Demo
+4. DevSecOps Pipeline
+5. Security Findings & The Value of Wiz
 6. What I'd Do Differently & What I Learned
 7. Q&A
 
 **ChatGPT image prompt:**
-Minimal vertical agenda layout on dark navy background (#0a0e1a). Seven numbered items in a clean vertical list, each on its own row. Numbers in large electric blue (#00B4D8) circles on the left, item text in white on the right. Items: "1 The Task", "2 The Solution & Live Demo", "3 DevSecOps Pipeline", "4 Security Findings", "5 The Value of Wiz", "6 What I'd Do Differently & Learned", "7 Q&A". Row 7 slightly muted/lighter to indicate it's after the main presentation. Clean sans-serif typography, generous spacing between rows. No decorative elements. 16:9 widescreen.
+Minimal vertical agenda layout on dark navy background (#0a0e1a). Seven numbered items in a clean vertical list, each on its own row. Numbers in large electric blue (#00B4D8) circles on the left, item text in white on the right. Items: "1 The Task", "2 Architecture", "3 Live Demo", "4 DevSecOps Pipeline", "5 Security Findings & The Value of Wiz", "6 What I'd Do Differently & What I Learned", "7 Q&A". Row 7 slightly muted/lighter to indicate it's after the main presentation. Clean sans-serif typography, generous spacing between rows. No decorative elements. 16:9 widescreen.
 
 ---
 
@@ -246,7 +246,7 @@ So: five tools, 40+ findings. The question is — which one do I fix first? And 
 **Slide content:** Security findings dashboard image
 
 **ChatGPT image prompt:**
-Security findings dashboard on dark navy background (#0a0e1a). Five tool labels as column headers in a row across the top: "Checkov", "Trivy", "AWS Inspector", "GuardDuty", "AWS Config / CloudTrail". Below each header, 2 finding cards in dark charcoal (#1e2433). Cards have colored left-border severity indicator: red = CRITICAL, orange = HIGH. Finding labels in white text: under Checkov — "SSH open 0.0.0.0/0", "AdministratorAccess IAM"; under Trivy — "perl: Critical CVE", "jaraco.context: High CVE"; under Inspector — "26 Critical CVEs (EC2)", "libssh Critical CVE"; under GuardDuty — "Runtime monitoring active"; under Config/CloudTrail — "Config drift detection", "Full API audit log". Bottom center: large badge "40+ Findings Detected" in red. Flat design, no gradients. 16:9 widescreen.
+Security findings dashboard on dark navy background (#0a0e1a). Five tool labels as column headers in a row across the top: "Checkov", "Trivy", "AWS Inspector", "GuardDuty", "AWS Config / CloudTrail". Below each header, 2 finding cards in dark charcoal (#1e2433). Cards have colored left-border severity indicator: red = CRITICAL, orange = HIGH. Finding labels in white text: under Checkov — "SSH open 0.0.0.0/0", "AdministratorAccess IAM"; under Trivy — "perl: Critical CVE", "ncurses: High CVE"; under Inspector — "26 Critical CVEs (EC2)", "libssh Critical CVE"; under GuardDuty — "S3 Public Access Granted (High)", "Block Public Access Disabled (Low)"; under Config/CloudTrail — "SSH rule: NON_COMPLIANT", "S3 public read: NON_COMPLIANT". Bottom center: large badge "40+ Findings Detected" in red. Flat design, no gradients. 16:9 widescreen.
 
 ---
 
