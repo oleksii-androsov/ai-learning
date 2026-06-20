@@ -414,13 +414,22 @@ Two-section layout on dark navy background (#0a0e1a). Top section: four-card hor
 **Speaker notes:**
 "If I were hardening this for production, four changes in priority order:
 
-First — AWS Secrets Manager with the External Secrets Operator. Remove credentials from Kubernetes Secrets and Terraform state entirely. Secrets live in AWS, rotated automatically, never stored in plain text anywhere.
+First — AWS Secrets Manager with the External Secrets Operator. Right now, credentials live in Kubernetes Secrets and in the Terraform state file — both in plain text. Secrets Manager stores them encrypted in AWS, rotates them automatically, and the External Secrets Operator syncs them into Kubernetes at runtime. The credential never sits in a file anywhere.
 
-Second — IMDSv2 enforcement on EC2 and immutable ECR image tags. IMDSv2 prevents server-side request forgery attacks from stealing instance credentials. Immutable tags prevent image tampering after a scan passes.
+Second — IMDSv2 on EC2 and immutable ECR image tags. The instance metadata service is what I queried in the attack simulation — that curl to 169.254.169.254 that returned AWS credentials. IMDSv2 adds a required session token to that request, which blocks the most common way attackers steal instance credentials remotely without being on the machine. Immutable ECR tags mean once an image is scanned and pushed, no one can overwrite that tag with a different image — the scan result stays valid.
 
-Third — replace static AWS credentials in GitHub Secrets with OIDC federation. The pipeline assumes an IAM role dynamically — no long-lived credentials stored anywhere.
+*(If asked about IMDSv2 in more detail)*
+*"The classic attack is SSRF — Server Side Request Forgery. An attacker tricks the application into making a request to the metadata URL on its behalf. With IMDSv1, that single request returns credentials. IMDSv2 requires a PUT request first to get a session token, which SSRF attacks typically can't do. One config line in Terraform: http_tokens = required."*
 
-Fourth — move MongoDB to a private subnet, remove the public IP from EC2, add VPC endpoints. Database traffic never leaves the AWS network."
+Third — OIDC federation instead of static AWS credentials in GitHub Secrets. Right now, the pipeline uses a long-lived access key stored in GitHub. If that key leaks, an attacker has permanent AWS access until someone rotates it. OIDC federation means GitHub requests a short-lived token from AWS for each pipeline run — it expires in minutes, nothing is stored anywhere.
+
+*(If asked about OIDC)*
+*"GitHub and AWS trust each other via OpenID Connect. GitHub says 'I am this repo, running this workflow' and AWS issues a temporary credential scoped to a specific IAM role. No key to store, no key to rotate, no key to leak."*
+
+Fourth — move MongoDB to a private subnet with no public IP, and add VPC endpoints. Currently the EC2 instance sits in a public subnet with a routable IP address — that's what made SSH from the internet possible. A private subnet has no internet gateway route. The machine can't be reached from outside AWS at all, even with port 22 open. VPC endpoints then allow the EC2 to reach AWS services like S3 for backups without that traffic ever leaving the AWS network.
+
+*(If asked about VPC endpoints)*
+*"Without VPC endpoints, traffic from a private subnet to S3 travels out through a NAT gateway to the public internet and back. A VPC endpoint creates a private route directly to the AWS service — faster, cheaper, and the traffic never touches the internet."*"
 
 **Slide content:** Four-step roadmap image
 
