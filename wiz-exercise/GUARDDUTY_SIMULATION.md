@@ -114,7 +114,9 @@ Severity: **High**
 Run this simulation **at least 2 hours before the presentation** to ensure
 the finding has appeared in GuardDuty before you go live.
 
-Note: tested on 2026-06-20 — finding did not appear after ~1 hour in a
-CloudLabs sandbox account. GuardDuty may have reduced detection coverage
-in sandbox/lab accounts. Try again closer to presentation day; if it still
-doesn't fire, the existing S3-related findings are sufficient for the demo.
+Note: a first attempt in the previous (now-expired) sandbox account did not
+produce a finding after ~1 hour. Retrying now in the new account
+(472151629584) — GuardDuty was confirmed already enabled there. If it
+still doesn't fire after 30-60 minutes, the existing S3-related findings
+(public access granted / block public access disabled) are sufficient
+for the demo on their own.
