@@ -19,11 +19,11 @@ metadata:
   annotations:
     alb.ingress.kubernetes.io/scheme: internet-facing
     alb.ingress.kubernetes.io/target-type: ip
-    alb.ingress.kubernetes.io/subnets: subnet-0ff157fc4e19364bf,subnet-021559705afaa1132
+    alb.ingress.kubernetes.io/subnets: subnet-0e8f2c1ab62d1f519,subnet-0431fdccadc147593
     alb.ingress.kubernetes.io/target-group-attributes: stickiness.enabled=true,stickiness.type=lb_cookie,stickiness.lb_cookie.duration_seconds=86400
     alb.ingress.kubernetes.io/load-balancer-attributes: idle_timeout.timeout_seconds=600
     alb.ingress.kubernetes.io/listen-ports: '[{"HTTP": 80}, {"HTTPS": 443}]'
-    alb.ingress.kubernetes.io/certificate-arn: arn:aws:acm:us-east-1:329153220664:certificate/7fc34d08-b939-41fd-981e-27352dcf3c49
+    alb.ingress.kubernetes.io/certificate-arn: arn:aws:acm:us-east-1:472151629584:certificate/d10e08ad-476f-4a31-a683-3fb883b19a61
     alb.ingress.kubernetes.io/ssl-redirect: '443'
 spec:
   ingressClassName: alb
