@@ -238,7 +238,7 @@ Two-panel infographic on dark navy background (#0a0e1a). Left panel labeled "Bus
 
 *(Switch to AWS Console → Inspector → Findings → filter: Resource type = EC2 Instance, Severity = Critical)*
 
-"Inspector scanned the EC2 and found [N] critical CVEs. Not 'Ubuntu is old' as a single flag — it lists every package on that machine with a known vulnerability. The one I want to highlight — search for libssh:"
+"Inspector scanned the EC2 and found 26 critical CVEs. Not 'Ubuntu is old' as a single flag — it lists every package on that machine with a known vulnerability. The one I want to highlight — search for libssh:"
 
 *(Click into the libssh / libssh-4 finding, or search the findings table for "libssh")*
 
@@ -260,9 +260,9 @@ Two-panel infographic on dark navy background (#0a0e1a). Left panel labeled "Bus
 
 "CloudTrail is the audit log — every API call, who made it, when, from which IP. If something goes wrong, this is where the investigation starts.
 
-So: five tools, [N]+ findings. The question is — which one do I fix first? And do any of these connect into something worse than each one individually?"
+So: five tools, 40+ findings. The question is — which one do I fix first? And do any of these connect into something worse than each one individually?"
 
-*(Note: exact finding counts above are placeholders — Inspector was just re-enabled in the new account and findings are still populating. Check actual numbers before presenting and update [N] accordingly. See DEMO_RUNBOOK.md pre-flight checklist.)*
+*(Note: Inspector alone now lists ~1,495 findings across all severities and resource types in the new account — far more than the "40+" framing suggests. Don't show the unfiltered total live; stick to the filtered views used above — EC2 Critical = 26, ECR Critical = 4 — which is what the talking points are built around.)*
 
 **Slide content:** Security findings dashboard image
 

@@ -118,11 +118,14 @@ CloudTrail Event history:
 https://us-east-1.console.aws.amazon.com/cloudtrailv2/home?region=us-east-1#/events
 ```
 
-**Before presenting:** open each of the four links above and note the actual
-finding counts (Inspector critical count, GuardDuty finding titles, Config
-compliance status). Update the "[N]" placeholders in PRESENTATION_SCRIPT.md
-Slide 8 with real numbers — Inspector was only just re-enabled in the new
-account and findings take time to populate.
+**Confirmed counts (as of 2026-06-22):**
+- Inspector EC2 Critical: 26 findings
+- Inspector ECR Critical: 4 findings (all CVE-2026-12087 - perl)
+- libssh CVEs: 11 total (1 Critical — CVE-2026-3731, 2 High, rest Medium/Low)
+- Inspector total findings across account (all severities, all resource types): ~1,495 — do not show this raw total live, it's noisy. Stick to the filtered EC2/ECR Critical views above.
+
+Re-check GuardDuty and Config the morning of the presentation in case the
+GuardDuty credential exfiltration simulation produced a new finding.
 
 ---
 
