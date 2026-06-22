@@ -417,21 +417,26 @@ def get_weather(city, dates=None):
 
 
 def run_tool(tool_name, tool_input):
-    if tool_name == "discover_movies":
-        return discover_movies(**tool_input)
-    if tool_name == "get_movie_details":
-        return get_movie_details(**tool_input)
-    if tool_name == "get_current_listings":
-        return get_current_listings(**tool_input)
-    if tool_name == "get_upcoming_listings":
-        return get_upcoming_listings(**tool_input)
-    if tool_name == "get_weather":
-        return get_weather(**tool_input)
-    if tool_name == "find_similar":
-        return find_similar(**tool_input)
-    if tool_name == "get_showtimes":
-        return get_showtimes(**tool_input)
-    return f"Unknown tool: {tool_name}"
+    try:
+        if tool_name == "discover_movies":
+            return discover_movies(**tool_input)
+        if tool_name == "get_movie_details":
+            return get_movie_details(**tool_input)
+        if tool_name == "get_current_listings":
+            return get_current_listings(**tool_input)
+        if tool_name == "get_upcoming_listings":
+            return get_upcoming_listings(**tool_input)
+        if tool_name == "get_weather":
+            return get_weather(**tool_input)
+        if tool_name == "find_similar":
+            return find_similar(**tool_input)
+        if tool_name == "get_showtimes":
+            return get_showtimes(**tool_input)
+        return f"Unknown tool: {tool_name}"
+    except Exception as e:
+        # A tool_use block always needs a matching tool_result — never let an
+        # exception here propagate, or it corrupts the conversation history.
+        return f"Tool '{tool_name}' failed: {e}. Let the user know this lookup didn't work and continue without it."
 
 
 SYSTEM_PROMPT = """You are Movie Buddy, a knowledgeable and opinionated film companion with broad general knowledge.

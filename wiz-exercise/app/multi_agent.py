@@ -214,15 +214,21 @@ def _call_specialist(name, request):
     label = name.replace("ask_", "").replace("_", "-").title()
 
     def _run():
-        if name == "ask_tracker":
-            return _run_specialist(TRACKER_PROMPT, TRACKER_TOOLS, request, model="claude-sonnet-4-6")
-        if name == "ask_explorer":
-            return _run_specialist(EXPLORER_PROMPT, EXPLORER_TOOLS, request, model="claude-sonnet-4-6")
-        if name == "ask_fact_checker":
-            return _run_specialist(FACTCHECK_PROMPT, FACTCHECK_TOOLS, request, model="claude-haiku-4-5-20251001")
-        if name == "ask_planner":
-            return _run_specialist(PLANNER_PROMPT, PLANNER_TOOLS, request, model="claude-sonnet-4-6")
-        return f"Unknown specialist: {name}"
+        try:
+            if name == "ask_tracker":
+                return _run_specialist(TRACKER_PROMPT, TRACKER_TOOLS, request, model="claude-sonnet-4-6")
+            if name == "ask_explorer":
+                return _run_specialist(EXPLORER_PROMPT, EXPLORER_TOOLS, request, model="claude-sonnet-4-6")
+            if name == "ask_fact_checker":
+                return _run_specialist(FACTCHECK_PROMPT, FACTCHECK_TOOLS, request, model="claude-haiku-4-5-20251001")
+            if name == "ask_planner":
+                return _run_specialist(PLANNER_PROMPT, PLANNER_TOOLS, request, model="claude-sonnet-4-6")
+            return f"Unknown specialist: {name}"
+        except Exception as e:
+            # This result becomes a tool_result for the orchestrator's tool_use block.
+            # Never let it raise — that would leave a tool_use without a matching
+            # tool_result and permanently corrupt the conversation history.
+            return f"Specialist '{name}' failed: {e}. Continue without this specialist's input."
 
     if LLMOBS_ENABLED:
         with LLMObs.agent(name=label) as span:
