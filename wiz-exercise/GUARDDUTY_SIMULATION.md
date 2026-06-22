@@ -17,7 +17,7 @@ detections — it's how credential theft from a compromised EC2 gets caught.
 Run this from your terminal (the SSH key is in the repo):
 
 ```bash
-ssh -i wiz-exercise/wiz-exercise-key ubuntu@100.52.232.237
+ssh -i wiz-exercise/wiz-exercise-key ubuntu@44.201.2.128
 ```
 
 ---
@@ -76,8 +76,8 @@ You should see a response confirming you are acting as the EC2 role:
 ```json
 {
   "UserId": "AROA...",
-  "Account": "329153220664",
-  "Arn": "arn:aws:sts::329153220664:assumed-role/movie-buddy-ec2-role/i-..."
+  "Account": "472151629584",
+  "Arn": "arn:aws:sts::472151629584:assumed-role/movie-buddy-ec2-role/i-..."
 }
 ```
 

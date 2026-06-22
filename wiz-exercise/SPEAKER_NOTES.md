@@ -149,7 +149,7 @@ Five tools, 40+ findings. The question is — which one do I fix first? And do a
 
 None of those tools can answer that question. Let me show you why — concretely.
 
-[Open browser — navigate to https://movie-buddy-tfstate-329153220664.s3.amazonaws.com/]
+[Open browser — navigate to https://movie-buddy-tfstate-472151629584.s3.amazonaws.com/]
 
 This is the Terraform state bucket. Publicly readable — no credentials, no AWS account. Just a browser.
 
@@ -157,13 +157,13 @@ This is the Terraform state bucket. Publicly readable — no credentials, no AWS
 
 Username and password in plain text. Now watch how far this goes.
 
-[Run: ssh -i wiz-exercise/wiz-exercise-key ubuntu@100.52.232.237]
+[Run: ssh -i wiz-exercise/wiz-exercise-key ubuntu@44.201.2.128]
 
 Port 22 is open to the internet. I'm in. I dump the entire database — and I don't need my own AWS credentials. The EC2 has AdministratorAccess. I use the machine's own identity.
 
 [Run mongodump inside EC2, then aws s3 cp to exfiltrate]
 
-[Back in local terminal: aws s3 ls s3://movie-buddy-tfstate-329153220664/exfil/]
+[Back in local terminal: aws s3 ls s3://movie-buddy-tfstate-472151629584/exfil/]
 
 The entire customer database is in S3 — staged using your own cloud account. No credentials of their own at any step.
 
