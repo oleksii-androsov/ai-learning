@@ -236,31 +236,33 @@ Two-panel infographic on dark navy background (#0a0e1a). Left panel labeled "Bus
 
 "Checkov runs before anything touches AWS. 10 findings — the two that matter most: SSH open to the internet, AdministratorAccess on EC2. Soft-fail here intentionally so the pipeline still ran — in production these would block it."
 
-*(Switch to AWS Console → Inspector → filter by EC2, Critical)*
+*(Switch to AWS Console → Inspector → Findings → filter: Resource type = EC2 Instance, Severity = Critical)*
 
-"Inspector scanned the EC2 and found 26 critical CVEs. Not 'Ubuntu is old' as a single flag — it lists every package on that machine with a known vulnerability. The one I want to highlight:"
+"Inspector scanned the EC2 and found [N] critical CVEs. Not 'Ubuntu is old' as a single flag — it lists every package on that machine with a known vulnerability. The one I want to highlight — search for libssh:"
 
-*(Click into the libssh / libssh-4 finding)*
+*(Click into the libssh / libssh-4 finding, or search the findings table for "libssh")*
 
 "Critical CVE in libssh — the SSH library — on the same machine where port 22 is open to the internet. Not just the port is exposed, but the SSH implementation itself is vulnerable."
 
-*(Switch to Inspector → filter by ECR Container Image)*
+*(Switch to Inspector → Findings → filter: Resource type = AWS ECR Container Image)*
 
 "ECR: critical CVE in perl in the running container image. Inspector gives CVE IDs and severity scores but can't tell you if these are actually reachable from outside."
 
 *(Switch to AWS Console → GuardDuty → Findings)*
 
-"GuardDuty watches for suspicious behavior — not misconfigurations, but actions. Two findings: public access was granted to the S3 bucket, and Block Public Access was disabled. Same bucket that Checkov and Config flagged — but GuardDuty caught the act of making it public. Three tools, same bucket, three completely different signals. None talking to each other."
+"GuardDuty watches for suspicious behavior — not misconfigurations, but actions. [Describe whatever findings are present — e.g. public access granted to the S3 bucket, Block Public Access disabled, or instance credential exfiltration if the simulation fired.] Same bucket / same machine that Checkov and Config flagged — but GuardDuty catches the actual behavior. Multiple tools, same resource, completely different signals. None talking to each other."
 
 *(Switch to AWS Console → Config → Rules)*
 
 "Config runs two compliance rules I deployed via Terraform. SSH open to internet: non-compliant. Public S3 bucket: non-compliant. Same findings as Checkov — but Config catches them on the live resource continuously, even if someone bypasses the pipeline and changes things manually."
 
-*(Switch to AWS Console → CloudTrail)*
+*(Switch to AWS Console → CloudTrail → Event history)*
 
 "CloudTrail is the audit log — every API call, who made it, when, from which IP. If something goes wrong, this is where the investigation starts.
 
-So: five tools, 40+ findings. The question is — which one do I fix first? And do any of these connect into something worse than each one individually?"
+So: five tools, [N]+ findings. The question is — which one do I fix first? And do any of these connect into something worse than each one individually?"
+
+*(Note: exact finding counts above are placeholders — Inspector was just re-enabled in the new account and findings are still populating. Check actual numbers before presenting and update [N] accordingly. See DEMO_RUNBOOK.md pre-flight checklist.)*
 
 **Slide content:** Security findings dashboard image
 

@@ -86,32 +86,43 @@ kubectl get clusterrolebinding movie-buddy-cluster-admin -o yaml
 
 ## SLIDE 8 — Security Findings
 
-AWS Console:
+GitHub:
 ```
 GitHub Actions → Infra CI run → Checkov step
 ```
 
+Inspector (EC2 critical CVEs) — direct console link:
 ```
-AWS Console → Inspector → filter: Resource type = EC2 Instance, Severity = Critical
+https://us-east-1.console.aws.amazon.com/inspector/v2/home?region=us-east-1#/findings
+```
+Filter: Resource type = AWS EC2 Instance, Severity = Critical.
+Search the findings table for "libssh" and click into that finding to show detail.
+
+Inspector (ECR container image CVEs) — same page, change filter:
+```
+Filter: Resource type = AWS ECR Container Image
 ```
 
-Click into the libssh / libssh-4 finding (show detail)
-
+GuardDuty:
 ```
-AWS Console → Inspector → filter: Resource type = ECR Container Image
-```
-
-```
-AWS Console → GuardDuty → Findings
+https://us-east-1.console.aws.amazon.com/guardduty/home?region=us-east-1#/findings
 ```
 
+Config Rules:
 ```
-AWS Console → Config → Rules
+https://us-east-1.console.aws.amazon.com/config/home?region=us-east-1#/rules
 ```
 
+CloudTrail Event history:
 ```
-AWS Console → CloudTrail → Event history
+https://us-east-1.console.aws.amazon.com/cloudtrailv2/home?region=us-east-1#/events
 ```
+
+**Before presenting:** open each of the four links above and note the actual
+finding counts (Inspector critical count, GuardDuty finding titles, Config
+compliance status). Update the "[N]" placeholders in PRESENTATION_SCRIPT.md
+Slide 8 with real numbers — Inspector was only just re-enabled in the new
+account and findings take time to populate.
 
 ---
 
