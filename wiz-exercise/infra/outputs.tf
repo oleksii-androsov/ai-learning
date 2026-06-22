@@ -33,4 +33,19 @@ output "eks_cluster_endpoint" {
   description = "EKS cluster API endpoint"
   value       = aws_eks_cluster.main.endpoint
 }
+
+output "public_subnet_ids" {
+  description = "Public subnet IDs for the ALB ingress annotation"
+  value       = "${aws_subnet.public.id},${aws_subnet.public_b.id}"
+}
+
+output "ec2_security_group_id" {
+  description = "Security group ID for the MongoDB EC2 instance"
+  value       = aws_security_group.ec2_sg.id
+}
+
+output "ec2_iam_role_name" {
+  description = "IAM role name attached to the MongoDB EC2 instance"
+  value       = aws_iam_role.ec2_role.name
+}
 # CI/CD test

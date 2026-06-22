@@ -1,0 +1,19 @@
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: movie-buddy-sa
+  namespace: default
+---
+# Intentional weakness: grants full cluster-admin to the application pod
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: movie-buddy-cluster-admin
+subjects:
+  - kind: ServiceAccount
+    name: movie-buddy-sa
+    namespace: default
+roleRef:
+  kind: ClusterRole
+  name: cluster-admin
+  apiGroup: rbac.authorization.k8s.io

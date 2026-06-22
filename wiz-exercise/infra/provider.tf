@@ -8,7 +8,7 @@ terraform {
   required_version = ">= 1.3.0"
 
   backend "s3" {
-    bucket = "movie-buddy-tfstate-329153220664"
+    bucket = "movie-buddy-tfstate-472151629584"
     key    = "wiz-exercise/terraform.tfstate"
     region = "us-east-1"
   }

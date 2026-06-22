@@ -1,0 +1,42 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: movie-buddy
+  namespace: default
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: movie-buddy
+  template:
+    metadata:
+      labels:
+        app: movie-buddy
+    spec:
+      serviceAccountName: movie-buddy-sa
+      containers:
+        - name: movie-buddy
+          image: 472151629584.dkr.ecr.us-east-1.amazonaws.com/movie-buddy:latest
+          ports:
+            - containerPort: 8501
+          env:
+            - name: MONGO_URL
+              valueFrom:
+                secretKeyRef:
+                  name: movie-buddy-secrets
+                  key: mongo_url
+            - name: ANTHROPIC_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: movie-buddy-secrets
+                  key: anthropic_api_key
+            - name: TAVILY_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: movie-buddy-secrets
+                  key: tavily_api_key
+            - name: TMDB_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: movie-buddy-secrets
+                  key: tmdb_api_key

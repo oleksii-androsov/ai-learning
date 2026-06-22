@@ -126,7 +126,7 @@ resource "aws_instance" "mongodb" {
     mongodump --uri="mongodb://${var.mongodb_username}:${var.mongodb_password}@localhost:27017" \
       --out /tmp/backup-\$DATE
     tar -czf /tmp/backup-\$DATE.tar.gz -C /tmp backup-\$DATE
-    aws s3 cp /tmp/backup-\$DATE.tar.gz s3://${var.project_name}-db-backups/\$DATE.tar.gz
+    aws s3 cp /tmp/backup-\$DATE.tar.gz s3://${var.project_name}-db-backups-${data.aws_caller_identity.current.account_id}/\$DATE.tar.gz
     rm -rf /tmp/backup-\$DATE /tmp/backup-\$DATE.tar.gz
     BACKUP
 

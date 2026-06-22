@@ -1,5 +1,5 @@
 resource "aws_s3_bucket" "db_backups" {
-  bucket        = "${var.project_name}-db-backups"
+  bucket        = "${var.project_name}-db-backups-${data.aws_caller_identity.current.account_id}"
   force_destroy = true
 
   tags = { Name = "${var.project_name}-db-backups" }
