@@ -13,3 +13,4 @@ variable "mongodb_username" {
 variable "mongodb_password" {
   default = "MovieBuddy2024!"
 }
+# pipeline test comment
