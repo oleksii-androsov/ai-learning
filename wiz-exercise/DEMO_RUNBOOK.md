@@ -221,3 +221,24 @@ kubectl describe ingress movie-buddy-ingress
 - [ ] Confirm AWS CLI is authenticated on the machine you're presenting from: `aws sts get-caller-identity`
 - [ ] Confirm kubectl context points to the right cluster: `kubectl config current-context`
 - [ ] Have this file (`DEMO_RUNBOOK.md`) open in a separate window/tab, not the one you're sharing — or open in the terminal pane if sharing full screen
+- [ ] Confirm the tfstate bucket is still publicly readable: `curl -s -o /dev/null -w "%{http_code}\n" https://movie-buddy-tfstate-472151629584.s3.amazonaws.com/` should return `200`. **This is a manual setting, not managed by Terraform** — if the bucket is ever recreated (e.g. full account rebuild), you must re-run:
+  ```bash
+  aws s3api put-public-access-block --bucket movie-buddy-tfstate-472151629584 \
+    --public-access-block-configuration BlockPublicAcls=false,IgnorePublicAcls=false,BlockPublicPolicy=false,RestrictPublicBuckets=false
+
+  aws s3api put-bucket-policy --bucket movie-buddy-tfstate-472151629584 --policy '{
+    "Version": "2012-10-17",
+    "Statement": [
+      {
+        "Sid": "PublicReadAndList",
+        "Effect": "Allow",
+        "Principal": "*",
+        "Action": ["s3:GetObject", "s3:ListBucket"],
+        "Resource": [
+          "arn:aws:s3:::movie-buddy-tfstate-472151629584",
+          "arn:aws:s3:::movie-buddy-tfstate-472151629584/*"
+        ]
+      }
+    ]
+  }'
+  ```
