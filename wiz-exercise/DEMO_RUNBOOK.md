@@ -173,6 +173,12 @@ exit
 aws s3 ls s3://movie-buddy-tfstate-472151629584/exfil/
 ```
 
+**Cleanup after the demo — run this if you want to repeat the attack path later** (otherwise stale leftovers sit on EC2 and in S3, and the demo loses its fresh-timestamp effect):
+```bash
+ssh -i wiz-exercise/wiz-exercise-key ubuntu@44.201.2.128 "rm -rf /tmp/exfil /tmp/movie_buddy_dump.tar.gz"
+aws s3 rm s3://movie-buddy-tfstate-472151629584/exfil/movie_buddy_dump.tar.gz
+```
+
 ---
 
 ## NOT IN MAIN FLOW — only if asked / time permits
